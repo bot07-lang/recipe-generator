@@ -4,7 +4,6 @@ import Notification from '../components/Notification';
 
 export default function Developer() {
   const [name, setName] = useState('My Awesome Template');
-  const [website, setWebsite] = useState('');
   const [html, setHtml] = useState('<div class="recipe-card">{{TITLE}}{{INGREDIENTS}}{{INSTRUCTIONS}}</div>');
   const [saved, setSaved] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -22,7 +21,7 @@ export default function Developer() {
         const response = await fetch(previewImage);
         const blob = await response.blob();
         
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from('template-previews')
           .upload(fileName, blob);
 
@@ -62,7 +61,6 @@ export default function Developer() {
       
       // Clear form
       setName('My Awesome Template');
-      setWebsite('');
       setHtml('<div class="recipe-card">{{TITLE}}{{INGREDIENTS}}{{INSTRUCTIONS}}</div>');
       setPreviewImage(null);
       
@@ -93,7 +91,6 @@ export default function Developer() {
       <div className="shell-card">
         <div className="section-title">Template Manager</div>
         <div className="form-group"><label>Template Name</label><input className="input" value={name} onChange={e=>setName(e.target.value)} /></div>
-        <div className="form-group"><label>Website (Optional)</label><input className="input" value={website} onChange={e=>setWebsite(e.target.value)} /></div>
         <div className="form-group"><label>Preview Image (Optional)</label>
           <div className="dz" onClick={()=>document.getElementById('preview-file')?.click()}
                onDragOver={e=>{e.preventDefault();}}
