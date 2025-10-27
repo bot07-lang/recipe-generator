@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../supabase';
+import Notification from '../components/Notification';
 
 export default function Developer() {
   const [name, setName] = useState('My Awesome Template');
@@ -7,6 +8,7 @@ export default function Developer() {
   const [html, setHtml] = useState('<div class="recipe-card">{{TITLE}}{{INGREDIENTS}}{{INSTRUCTIONS}}</div>');
   const [saved, setSaved] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   async function saveTemplate() {
     try {
@@ -26,7 +28,7 @@ export default function Developer() {
 
         if (uploadError) {
           console.error('Error uploading image:', uploadError);
-          alert('Error uploading preview image. Template saved without image.');
+          setNotification({ message: 'Error uploading preview image. Template saved without image.', type: 'error' });
         } else {
           // Get public URL
           const { data: urlData } = supabase.storage
@@ -51,7 +53,7 @@ export default function Developer() {
 
       if (error) {
         console.error('Error saving template:', error);
-        alert('Error saving template. Please try again.');
+        setNotification({ message: 'Error saving template. Please try again.', type: 'error' });
         return;
       }
 
@@ -64,16 +66,22 @@ export default function Developer() {
       setHtml('<div class="recipe-card">{{TITLE}}{{INGREDIENTS}}{{INSTRUCTIONS}}</div>');
       setPreviewImage(null);
       
-      alert('Template saved successfully!');
+      setNotification({ message: 'Template saved successfully!', type: 'success' });
     } catch (error) {
       console.error('Error saving template:', error);
-      alert('Error saving template. Please try again.');
+      setNotification({ message: 'Error saving template. Please try again.', type: 'error' });
     }
   }
 
   function handleImageUpload(file: File) {
-    if (!file.type.startsWith('image/')) return alert('Please use an image file.');
-    if (file.size > 10 * 1024 * 1024) return alert('Image must be less than 10MB.');
+    if (!file.type.startsWith('image/')) {
+      setNotification({ message: 'Please use an image file.', type: 'error' });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setNotification({ message: 'Image must be less than 10MB.', type: 'error' });
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => setPreviewImage(String(reader.result));
     reader.readAsDataURL(file);
@@ -116,6 +124,13 @@ export default function Developer() {
                  {saved && <span style={{color:'#0f766e',fontWeight:700}}>Saved!</span>}
                </div>
       </div>
+      {notification && (
+        <Notification 
+          message={notification.message} 
+          type={notification.type}
+          onClose={() => setNotification(null)}
+        />
+      )}
     </div>
   );
 }

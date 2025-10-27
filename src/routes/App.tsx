@@ -22,7 +22,7 @@ export default function App() {
         </nav>
       </header>
       <main>
-        <Outlet />
+        <Outlet context={{ setNotification }} />
       </main>
       <footer className="site-footer">Made for content teams and developers</footer>
     </div>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import html2canvas from 'html2canvas';
 import { supabase, Template } from '../supabase';
+import Notification from '../components/Notification';
 
 const DEFAULT_TEMPLATES: Template[] = [
   {
@@ -217,6 +218,7 @@ Calories: 320 per serving
   const [pngUrl, setPngUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const selected = useMemo(() => {
     if (templateName) {
       return templates.find(t => t.name === templateName) || null;
@@ -308,8 +310,14 @@ Calories: 320 per serving
   }, [selected]);
 
   function onFile(f: File) {
-    if (!f.type.startsWith('image/')) return alert('Please use an image file.');
-    if (f.size > 5 * 1024 * 1024) return alert('Image must be less than 5MB.');
+    if (!f.type.startsWith('image/')) {
+      setNotification({ message: 'Please use an image file.', type: 'error' });
+      return;
+    }
+    if (f.size > 5 * 1024 * 1024) {
+      setNotification({ message: 'Image must be less than 5MB.', type: 'error' });
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => setImg(String(reader.result));
     reader.readAsDataURL(f);
@@ -318,10 +326,10 @@ Calories: 320 per serving
   async function copyHtml() {
     try {
       await navigator.clipboard.writeText(filledHtml);
-      alert('HTML copied to clipboard!');
+      setNotification({ message: 'HTML copied to clipboard!', type: 'success' });
     } catch (err) {
       console.error('Failed to copy:', err);
-      alert('Failed to copy HTML. Please try again.');
+      setNotification({ message: 'Failed to copy HTML. Please try again.', type: 'error' });
     }
   }
 
@@ -369,10 +377,10 @@ Calories: 320 per serving
       link.download = `recipe-card-${Date.now()}.png`;
       link.click();
       
-      alert('PNG generated and downloaded!');
+      setNotification({ message: 'PNG generated and downloaded!', type: 'success' });
     } catch (err) {
       console.error('Failed to generate PNG:', err);
-      alert('Failed to generate PNG. Please try again.');
+      setNotification({ message: 'Failed to generate PNG. Please try again.', type: 'error' });
     } finally {
       setIsGenerating(false);
     }
@@ -469,6 +477,13 @@ Calories: 320 per serving
           </div>
         </div>
       </div>
+      {notification && (
+        <Notification 
+          message={notification.message} 
+          type={notification.type}
+          onClose={() => setNotification(null)}
+        />
+      )}
     </div>
   );
 }
