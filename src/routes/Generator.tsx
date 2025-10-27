@@ -285,11 +285,7 @@ Calories: 320 per serving
   const filledHtml = useMemo(() => {
     if (!selected) return '';
     const d = parseRecipeData(raw);
-    console.log('Parsed data:', d);
-    console.log('Raw input:', raw);
     const filled = fillPlaceholders(selected.html, d, img);
-    console.log('Filled HTML:', filled);
-    console.log('Template HTML:', selected.html);
     return filled;
   }, [selected, raw, img]);
 
