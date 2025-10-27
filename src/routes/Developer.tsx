@@ -73,7 +73,7 @@ export default function Developer() {
 
   function handleImageUpload(file: File) {
     if (!file.type.startsWith('image/')) return alert('Please use an image file.');
-    if (file.size > 5 * 1024 * 1024) return alert('Image must be less than 5MB.');
+    if (file.size > 10 * 1024 * 1024) return alert('Image must be less than 10MB.');
     const reader = new FileReader();
     reader.onload = () => setPreviewImage(String(reader.result));
     reader.readAsDataURL(file);
