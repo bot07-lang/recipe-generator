@@ -219,6 +219,8 @@ Calories: 320 per serving
   const [isGenerating, setIsGenerating] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  // Dev-only relaxed parsing toggle (does NOT change default behavior)
+  const [flexParse, setFlexParse] = useState(false);
   const selected = useMemo(() => {
     if (templateName) {
       return templates.find(t => t.name === templateName) || null;
@@ -282,12 +284,25 @@ Calories: 320 per serving
     }
   }
 
+  // Light normalizer that only runs in test mode to add missing headers
+  function normalizeForFlex(text: string): string {
+    let out = text;
+    // Convert standalone headings to our expected ### form
+    out = out.replace(/^\s*ingredients\s*:?[\t ]*$/gim, '### Ingredients');
+    out = out.replace(/^\s*instructions\s*:?[\t ]*$/gim, '### Instructions');
+    // Optional sections
+    out = out.replace(/^\s*equipment\s*:?[\t ]*$/gim, '### Equipment');
+    out = out.replace(/^\s*nutrition(?:\s*facts)?\s*:?[\t ]*$/gim, '### Nutrition');
+    return out;
+  }
+
   const filledHtml = useMemo(() => {
     if (!selected) return '';
-    const d = parseRecipeData(raw);
+    const source = flexParse ? normalizeForFlex(raw) : raw;
+    const d = parseRecipeData(source);
     const filled = fillPlaceholders(selected.html, d, img);
     return filled;
-  }, [selected, raw, img]);
+  }, [selected, raw, img, flexParse]);
 
   // Validate placeholders present in the selected template
   const missingPlaceholders = useMemo(() => {
@@ -420,6 +435,10 @@ Calories: 320 per serving
         <div className="form-group">
           <label>Recipe Content</label>
           <textarea className="textarea" value={raw} onChange={e=>setRaw(e.target.value)} />
+        </div>
+        <div className="form-group" style={{display:'flex',alignItems:'center',gap:10}}>
+          <input id="flex-parse" type="checkbox" checked={flexParse} onChange={e=>setFlexParse(e.target.checked)} />
+          <label htmlFor="flex-parse" style={{userSelect:'none'}}>Flex parse (test) — auto-detect Ingredients/Instructions without ###</label>
         </div>
         <div className="form-group">
           <label>Recipe Image (Optional, max 5MB)</label>
