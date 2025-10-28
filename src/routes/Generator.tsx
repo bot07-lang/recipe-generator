@@ -286,12 +286,15 @@ Calories: 320 per serving
   // Light normalizer that only runs in test mode to add missing headers
   function normalizeForFlex(text: string): string {
     let out = text;
-    // Convert standalone headings to our expected ### form
+    // Convert # or ### to our expected ### form
+    out = out.replace(/^\s*#{1,3}\s*ingredients\s*:?[\t ]*$/gim, '### Ingredients');
+    out = out.replace(/^\s*#{1,3}\s*instructions\s*:?[\t ]*$/gim, '### Instructions');
+    // Optional sections
+    out = out.replace(/^\s*#{1,3}\s*equipment\s*:?[\t ]*$/gim, '### Equipment');
+    out = out.replace(/^\s*#{1,3}\s*nutrition(?:\s*facts)?\s*:?[\t ]*$/gim, '### Nutrition');
+    // Also convert standalone headings (no # at all)
     out = out.replace(/^\s*ingredients\s*:?[\t ]*$/gim, '### Ingredients');
     out = out.replace(/^\s*instructions\s*:?[\t ]*$/gim, '### Instructions');
-    // Optional sections
-    out = out.replace(/^\s*equipment\s*:?[\t ]*$/gim, '### Equipment');
-    out = out.replace(/^\s*nutrition(?:\s*facts)?\s*:?[\t ]*$/gim, '### Nutrition');
     return out;
   }
 
