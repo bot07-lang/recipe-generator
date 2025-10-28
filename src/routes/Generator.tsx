@@ -285,20 +285,7 @@ Calories: 320 per serving
   const filledHtml = useMemo(() => {
     if (!selected) return '';
     const d = parseRecipeData(raw);
-    let filled = fillPlaceholders(selected.html, d, img);
-    
-    // Apply glass pink effect to .card background
-    filled = filled.replace(
-      /(\.card\s*\{[^}]*?)background:var\(--page\);/g,
-      `$1background:rgba(255, 182, 193, 0.4);backdrop-filter:blur(10px);`
-    );
-    
-    // Also update --page variable for consistency
-    filled = filled.replace(
-      /--page:#ffffff;/g,
-      `--page:rgba(255, 182, 193, 0.4);`
-    );
-    
+    const filled = fillPlaceholders(selected.html, d, img);
     return filled;
   }, [selected, raw, img]);
 
@@ -539,8 +526,7 @@ Calories: 320 per serving
               padding:'40px',
               display:'flex',
               justifyContent:'center',
-              alignItems:'flex-start',
-              background:'#fce4ec'
+              alignItems:'flex-start'
             }}>
               <div style={{
                 transform:'scale(0.75)',
