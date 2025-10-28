@@ -474,21 +474,24 @@ Calories: 320 per serving
           left:0,
           right:0,
           bottom:0,
-          background:'rgba(0,0,0,0.8)',
+          background:'rgba(0,0,0,0.5)',
           display:'flex',
           justifyContent:'center',
           alignItems:'center',
           zIndex:1000,
-          padding:'20px'
+          padding:'20px',
+          backdropFilter:'blur(6px)'
         }} onClick={()=>setShowPreview(false)}>
           <div style={{
             position:'relative',
-            background:'#fff',
+            background:'rgba(255, 192, 203, 0.2)',
+            border:'1px solid rgba(255, 182, 193, 0.6)',
+            backdropFilter:'blur(10px) saturate(1.2)',
             borderRadius:'20px',
             maxWidth:'90vw',
             maxHeight:'90vh',
             overflow:'auto',
-            boxShadow:'0 20px 60px rgba(0,0,0,0.4)'
+            boxShadow:'0 20px 60px rgba(204, 43, 94, 0.25), 0 8px 20px rgba(0,0,0,0.15)'
           }} onClick={(e)=>e.stopPropagation()}>
             {/* Close Button */}
             <button 
