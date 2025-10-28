@@ -396,106 +396,151 @@ Calories: 320 per serving
           </button>
         ))}
       </div>
-      <div className="shell-grid">
-        <div className="shell-card">
-          <div className="section-title">Content Creation Tools</div>
-          {selected && missingPlaceholders.length > 0 && (
-            <div style={{background:'#fff3cd',border:'1px solid #ffecb5',color:'#664d03',padding:10,borderRadius:8,marginBottom:10,fontSize:13}}>
-              Missing placeholders in this template: {missingPlaceholders.map(ph => `{{${ph}}}`).join(', ')}
-            </div>
-          )}
-          <div className="form-group">
-            <label>Select Template</label>
-            <select className="select" value={templateName} onChange={e=>{setTemplateName(e.target.value); const t = templates.find(tm => tm.name === e.target.value); if(t) setTemplateId(t.id);}}>
-              <option value="">Choose a beautiful template…</option>
-              {templates.map(t=> <option key={t.id} value={t.name}>{t.name}</option>)}
-            </select>
+      <div className="shell-card">
+        <div className="section-title">Content Creation Tools</div>
+        {selected && missingPlaceholders.length > 0 && (
+          <div style={{background:'#fff3cd',border:'1px solid #ffecb5',color:'#664d03',padding:10,borderRadius:8,marginBottom:10,fontSize:13}}>
+            Missing placeholders in this template: {missingPlaceholders.map(ph => `{{${ph}}}`).join(', ')}
           </div>
-          <div className="form-group">
-            <label>Recipe Content</label>
-            <textarea className="textarea" value={raw} onChange={e=>setRaw(e.target.value)} />
+        )}
+        <div className="form-group">
+          <label>Select Template</label>
+          <select className="select" value={templateName} onChange={e=>{setTemplateName(e.target.value); const t = templates.find(tm => tm.name === e.target.value); if(t) setTemplateId(t.id);}}>
+            <option value="">Choose a beautiful template…</option>
+            {templates.map(t=> <option key={t.id} value={t.name}>{t.name}</option>)}
+          </select>
+        </div>
+        <div className="form-group">
+          <label>Recipe Content</label>
+          <textarea className="textarea" value={raw} onChange={e=>setRaw(e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label>Recipe Image (Optional, max 5MB)</label>
+          <div className="dz" onClick={()=>document.getElementById('rg-file')?.click()}
+               onDragOver={e=>{e.preventDefault();}}
+               onDrop={e=>{e.preventDefault(); const f=e.dataTransfer.files?.[0]; if (f) onFile(f);}}>
+            Drag & drop an image or click to browse
+            <input id="rg-file" type="file" accept="image/*" style={{display:'none'}}
+                   onChange={e=>{const f=(e.target as HTMLInputElement).files?.[0]; if (f) onFile(f);}} />
+            {img && <div style={{marginTop:10}}><img src={img} style={{maxWidth:220,borderRadius:10}} /></div>}
           </div>
-          <div className="form-group">
-            <label>Recipe Image (Optional, max 5MB)</label>
-            <div className="dz" onClick={()=>document.getElementById('rg-file')?.click()}
-                 onDragOver={e=>{e.preventDefault();}}
-                 onDrop={e=>{e.preventDefault(); const f=e.dataTransfer.files?.[0]; if (f) onFile(f);}}>
-              Drag & drop an image or click to browse
-              <input id="rg-file" type="file" accept="image/*" style={{display:'none'}}
-                     onChange={e=>{const f=(e.target as HTMLInputElement).files?.[0]; if (f) onFile(f);}} />
-              {img && <div style={{marginTop:10}}><img src={img} style={{maxWidth:220,borderRadius:10}} /></div>}
-            </div>
-          </div>
-          <div className="actions">
-            <button className="btn btn-secondary" onClick={()=>setShowPreview(true)} disabled={!selected || !raw.trim()}>Preview</button>
-            <button className="btn btn-warn" onClick={async ()=>{
-              setGeneratedHtml(filledHtml);
-              // Save generated HTML to Supabase
-              if (selected && templateId) {
-                try {
-                  const { error } = await supabase
-                    .from('templates')
-                    .update({
-                      last_generated_html: filledHtml,
-                      last_generated_at: new Date().toISOString()
-                    })
-                    .eq('id', templateId);
-                  
-                  if (error) {
-                    console.error('Error saving generated HTML:', error);
-                  }
-                } catch (err) {
-                  console.error('Error saving generated HTML:', err);
+        </div>
+        <div className="actions">
+          <button className="btn btn-secondary" onClick={()=>setShowPreview(true)} disabled={!selected || !raw.trim()}>Preview</button>
+          <button className="btn btn-warn" onClick={async ()=>{
+            setGeneratedHtml(filledHtml);
+            // Save generated HTML to Supabase
+            if (selected && templateId) {
+              try {
+                const { error } = await supabase
+                  .from('templates')
+                  .update({
+                    last_generated_html: filledHtml,
+                    last_generated_at: new Date().toISOString()
+                  })
+                  .eq('id', templateId);
+                
+                if (error) {
+                  console.error('Error saving generated HTML:', error);
                 }
+              } catch (err) {
+                console.error('Error saving generated HTML:', err);
               }
-            }} disabled={!selected || !raw.trim()}>Generate</button>
-          </div>
-          {generatedHtml && (
-            <div className="result-bar">
-              <button className="btn" onClick={copyHtml}>Copy HTML</button>
-              <button className="btn btn-secondary" onClick={generatePng} disabled={isGenerating}>
-                {isGenerating ? 'Generating...' : 'Download PNG'}
-              </button>
-            </div>
-          )}
+            }
+          }} disabled={!selected || !raw.trim()}>Generate</button>
         </div>
-        <div className="shell-card">
-          <div className="section-title">Live Preview</div>
-          <div className="preview-pane">
-            {!selected ? (
-              <div style={{padding:20, color:'#666'}}>Select a template to preview.</div>
-            ) : !showPreview ? (
-              <div style={{padding:20, color:'#666', textAlign:'center'}}>
-                <div style={{fontSize:48, marginBottom:20}}>👀</div>
-                <div>Click "Preview" to see your recipe card</div>
-              </div>
-            ) : (
-              <div style={{width:'100%',height:'100%',overflow:'auto',position:'relative',display:'flex',justifyContent:'center',alignItems:'flex-start',padding:'20px'}}>
-                <div style={{
-                  transform:'scale(0.7)',
-                  transformOrigin:'top center',
-                  width:'1300px',
-                  minWidth:'1300px'
-                }}>
-                  <iframe 
-                    title="preview" 
-                    style={{
-                      width:'1300px',
-                      minWidth:'1300px',
-                      height:'900px',
-                      border:'2px solid #ddd',
-                      borderRadius:'12px',
-                      background:'#fff',
-                      boxShadow:'0 8px 24px rgba(0,0,0,0.15)'
-                    }} 
-                    srcDoc={filledHtml} 
-                  />
-                </div>
-              </div>
-            )}
+        {generatedHtml && (
+          <div className="result-bar">
+            <button className="btn" onClick={copyHtml}>Copy HTML</button>
+            <button className="btn btn-secondary" onClick={generatePng} disabled={isGenerating}>
+              {isGenerating ? 'Generating...' : 'Download PNG'}
+            </button>
           </div>
-        </div>
+        )}
       </div>
+
+      {/* Preview Modal */}
+      {showPreview && (
+        <div style={{
+          position:'fixed',
+          top:0,
+          left:0,
+          right:0,
+          bottom:0,
+          background:'rgba(0,0,0,0.8)',
+          display:'flex',
+          justifyContent:'center',
+          alignItems:'center',
+          zIndex:1000,
+          padding:'20px'
+        }} onClick={()=>setShowPreview(false)}>
+          <div style={{
+            position:'relative',
+            background:'#fff',
+            borderRadius:'20px',
+            maxWidth:'90vw',
+            maxHeight:'90vh',
+            overflow:'auto',
+            boxShadow:'0 20px 60px rgba(0,0,0,0.4)'
+          }} onClick={(e)=>e.stopPropagation()}>
+            {/* Close Button */}
+            <button 
+              onClick={()=>setShowPreview(false)}
+              style={{
+                position:'absolute',
+                top:'15px',
+                right:'15px',
+                background:'#fff',
+                border:'none',
+                width:'40px',
+                height:'40px',
+                borderRadius:'50%',
+                fontSize:'24px',
+                cursor:'pointer',
+                display:'flex',
+                alignItems:'center',
+                justifyContent:'center',
+                boxShadow:'0 4px 12px rgba(0,0,0,0.2)',
+                zIndex:10,
+                transition:'all 0.2s',
+                color:'#666'
+              }}
+              onMouseOver={(e)=>{e.currentTarget.style.transform='scale(1.1)'; e.currentTarget.style.background='#f0f0f0';}}
+              onMouseOut={(e)=>{e.currentTarget.style.transform='scale(1)'; e.currentTarget.style.background='#fff';}}
+            >
+              ×
+            </button>
+
+            {/* Preview Content */}
+            <div style={{
+              padding:'40px',
+              display:'flex',
+              justifyContent:'center',
+              alignItems:'flex-start'
+            }}>
+              <div style={{
+                transform:'scale(0.75)',
+                transformOrigin:'top center',
+                width:'1300px',
+                minWidth:'1300px'
+              }}>
+                <iframe 
+                  title="preview" 
+                  style={{
+                    width:'1300px',
+                    minWidth:'1300px',
+                    height:'900px',
+                    border:'2px solid #ddd',
+                    borderRadius:'12px',
+                    background:'#fff'
+                  }} 
+                  srcDoc={filledHtml} 
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {notification && (
         <Notification 
           message={notification.message} 
