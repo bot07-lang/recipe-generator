@@ -468,18 +468,26 @@ Calories: 320 per serving
                 <div>Click "Preview" to see your recipe card</div>
               </div>
             ) : (
-              <div style={{width:'100%',height:'100%',overflow:'auto',position:'relative'}}>
-                <iframe 
-                  title="preview" 
-                  style={{
-                    width:'100%',
-                    height:'100%',
-                    minHeight:'800px',
-                    border:'0',
-                    background:'#fff'
-                  }} 
-                  srcDoc={filledHtml} 
-                />
+              <div style={{width:'100%',height:'100%',overflow:'auto',position:'relative',display:'flex',justifyContent:'center',alignItems:'flex-start',padding:'20px'}}>
+                <div style={{
+                  transform:'scale(0.7)',
+                  transformOrigin:'top center',
+                  width:'100%',
+                  maxWidth:'1400px'
+                }}>
+                  <iframe 
+                    title="preview" 
+                    style={{
+                      width:'100%',
+                      height:'900px',
+                      border:'2px solid #ddd',
+                      borderRadius:'12px',
+                      background:'#fff',
+                      boxShadow:'0 8px 24px rgba(0,0,0,0.15)'
+                    }} 
+                    srcDoc={filledHtml} 
+                  />
+                </div>
               </div>
             )}
           </div>
