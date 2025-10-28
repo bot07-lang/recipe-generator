@@ -472,13 +472,14 @@ Calories: 320 per serving
                 <div style={{
                   transform:'scale(0.7)',
                   transformOrigin:'top center',
-                  width:'100%',
-                  maxWidth:'1400px'
+                  width:'1300px',
+                  minWidth:'1300px'
                 }}>
                   <iframe 
                     title="preview" 
                     style={{
-                      width:'100%',
+                      width:'1300px',
+                      minWidth:'1300px',
                       height:'900px',
                       border:'2px solid #ddd',
                       borderRadius:'12px',
