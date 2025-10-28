@@ -354,7 +354,7 @@ Calories: 320 per serving
       // Generate PNG using html2canvas on the card element directly
       const canvas = await html2canvas(cardElement || tempDiv, {
         backgroundColor: '#ffffff',
-        scale: 2, // Higher quality
+        scale: 1.2, // Lower scale for smaller file size, still good quality
         useCORS: true,
         allowTaint: true
       });
@@ -362,7 +362,7 @@ Calories: 320 per serving
       // Clean up
       document.body.removeChild(tempDiv);
 
-      // Convert to blob and create download URL
+      // Convert to JPEG blob with compression for smaller file size
       const blob = await new Promise<Blob>((resolve, reject) => {
         canvas.toBlob((blob) => {
           if (blob) {
@@ -370,7 +370,7 @@ Calories: 320 per serving
           } else {
             reject(new Error('Failed to create blob'));
           }
-        }, 'image/png');
+        }, 'image/jpeg', 0.85); // JPEG with 85% quality for smaller file size
       });
       const url = URL.createObjectURL(blob);
       
@@ -379,13 +379,13 @@ Calories: 320 per serving
       // Auto-download
       const link = document.createElement('a');
       link.href = url;
-      link.download = `recipe-card-${Date.now()}.png`;
+      link.download = `recipe-card-${Date.now()}.jpg`;
       link.click();
       
-      setNotification({ message: 'PNG generated and downloaded!', type: 'success' });
+      setNotification({ message: 'Recipe card image generated and downloaded!', type: 'success' });
     } catch (err) {
-      console.error('Failed to generate PNG:', err);
-      setNotification({ message: 'Failed to generate PNG. Please try again.', type: 'error' });
+      console.error('Failed to generate image:', err);
+      setNotification({ message: 'Failed to generate image. Please try again.', type: 'error' });
     } finally {
       setIsGenerating(false);
     }
@@ -460,7 +460,7 @@ Calories: 320 per serving
           <div className="result-bar">
             <button className="btn" onClick={copyHtml}>Copy HTML</button>
             <button className="btn btn-secondary" onClick={generatePng} disabled={isGenerating}>
-              {isGenerating ? 'Generating...' : 'Download PNG'}
+              {isGenerating ? 'Generating...' : 'Download Image'}
             </button>
           </div>
         )}
