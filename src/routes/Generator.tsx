@@ -327,8 +327,8 @@ Calories: 320 per serving
       setNotification({ message: 'Please use an image file.', type: 'error' });
       return;
     }
-    if (f.size > 5 * 1024 * 1024) {
-      setNotification({ message: 'Image must be less than 5MB.', type: 'error' });
+    if (f.size > 10 * 1024 * 1024) {
+      setNotification({ message: 'Image must be less than 10MB.', type: 'error' });
       return;
     }
     const reader = new FileReader();
@@ -441,8 +441,8 @@ Calories: 320 per serving
         <div className="form-group" style={{fontSize:12,color:'#555'}}>
           This input accepts both formats: headers with or without "###" (Ingredients, Instructions, Equipment, Nutrition).
         </div>
-        <div className="form-group">
-          <label>Recipe Image (Optional, max 5MB)</label>
+          <div className="form-group">
+            <label>Recipe Image (Optional, max 10MB)</label>
           <div className="dz" onClick={()=>document.getElementById('rg-file')?.click()}
                onDragOver={e=>{e.preventDefault();}}
                onDrop={e=>{e.preventDefault(); const f=e.dataTransfer.files?.[0]; if (f) onFile(f);}}>
