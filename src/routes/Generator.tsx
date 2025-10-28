@@ -340,12 +340,19 @@ Calories: 320 per serving
       tempDiv.style.position = 'absolute';
       tempDiv.style.left = '-9999px';
       tempDiv.style.top = '-9999px';
-      tempDiv.style.width = '1200px'; // Ensure horizontal layout (above 900px breakpoint)
-      tempDiv.style.minWidth = '1200px';
+      tempDiv.style.width = '1000px'; // Match template's max-width (980px) + padding
+      tempDiv.style.minWidth = '1000px';
+      tempDiv.style.display = 'inline-block';
       document.body.appendChild(tempDiv);
 
-      // Generate PNG using html2canvas
-      const canvas = await html2canvas(tempDiv, {
+      // Wait for content to render
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Get the actual card element (without body padding)
+      const cardElement = tempDiv.querySelector('.card') as HTMLElement;
+      
+      // Generate PNG using html2canvas on the card element directly
+      const canvas = await html2canvas(cardElement || tempDiv, {
         backgroundColor: '#ffffff',
         scale: 2, // Higher quality
         useCORS: true,
