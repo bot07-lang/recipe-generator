@@ -105,7 +105,26 @@ export default function Developer() {
           </div>
         </div>
         <div className="form-group"><label>HTML Template Code</label><textarea className="textarea" value={html} onChange={e=>setHtml(e.target.value)} /></div>
-        <div className="chips" style={{marginTop:8}}>
+        
+        <div style={{
+          background:'#e0f2fe',
+          border:'1px solid #0ea5e9',
+          borderRadius:'8px',
+          padding:'12px',
+          marginTop:'12px',
+          fontSize:'13px',
+          lineHeight:'1.5'
+        }}>
+          <strong style={{display:'block', marginBottom:'6px', color:'#0369a1'}}>📍 Placeholder Format Guide:</strong>
+          <div style={{color:'#0c4a6e'}}>
+            • Use <code style={{background:'#bae6fd', padding:'2px 6px', borderRadius:'4px'}}>{'{{KEY}}'}</code> format (recommended)<br/>
+            • Also supports <code style={{background:'#bae6fd', padding:'2px 6px', borderRadius:'4px'}}>{'[KEY]'}</code> or plain <code style={{background:'#bae6fd', padding:'2px 6px', borderRadius:'4px'}}>KEY</code> format<br/>
+            • Placeholders are case-insensitive<br/>
+            • Click the chips below to copy placeholders to your HTML
+          </div>
+        </div>
+        
+        <div className="chips" style={{marginTop:12}}>
           <span className="chip">{'{{TITLE}}'}</span>
           <span className="chip">{'{{DESCRIPTION}}'}</span>
           <span className="chip">{'{{COOK_TIME}}'}</span>
