@@ -219,8 +219,7 @@ Calories: 320 per serving
   const [isGenerating, setIsGenerating] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-  // Dev-only relaxed parsing toggle (does NOT change default behavior)
-  const [flexParse, setFlexParse] = useState(false);
+  // Input normalization: accept with or without ### section headers
   const selected = useMemo(() => {
     if (templateName) {
       return templates.find(t => t.name === templateName) || null;
@@ -298,11 +297,11 @@ Calories: 320 per serving
 
   const filledHtml = useMemo(() => {
     if (!selected) return '';
-    const source = flexParse ? normalizeForFlex(raw) : raw;
+    const source = normalizeForFlex(raw);
     const d = parseRecipeData(source);
     const filled = fillPlaceholders(selected.html, d, img);
     return filled;
-  }, [selected, raw, img, flexParse]);
+  }, [selected, raw, img]);
 
   // Validate placeholders present in the selected template
   const missingPlaceholders = useMemo(() => {
@@ -436,9 +435,8 @@ Calories: 320 per serving
           <label>Recipe Content</label>
           <textarea className="textarea" value={raw} onChange={e=>setRaw(e.target.value)} />
         </div>
-        <div className="form-group" style={{display:'flex',alignItems:'center',gap:10}}>
-          <input id="flex-parse" type="checkbox" checked={flexParse} onChange={e=>setFlexParse(e.target.checked)} />
-          <label htmlFor="flex-parse" style={{userSelect:'none'}}>Flex parse (test) — auto-detect Ingredients/Instructions without ###</label>
+        <div className="form-group" style={{fontSize:12,color:'#555'}}>
+          This input accepts both formats: headers with or without "###" (Ingredients, Instructions, Equipment, Nutrition).
         </div>
         <div className="form-group">
           <label>Recipe Image (Optional, max 5MB)</label>
