@@ -438,10 +438,7 @@ Calories: 320 per serving
           <label>Recipe Content</label>
           <textarea className="textarea" value={raw} onChange={e=>setRaw(e.target.value)} />
         </div>
-        <div className="form-group" style={{fontSize:12,color:'#555'}}>
-          This input accepts both formats: headers with or without "###" (Ingredients, Instructions, Equipment, Nutrition).
-        </div>
-          <div className="form-group">
+        <div className="form-group">
             <label>Recipe Image (Optional, max 10MB)</label>
           <div className="dz" onClick={()=>document.getElementById('rg-file')?.click()}
                onDragOver={e=>{e.preventDefault();}}
