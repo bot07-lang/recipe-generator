@@ -540,9 +540,9 @@ Calories: 320 per serving
                     width:'1300px',
                     minWidth:'1300px',
                     height:'900px',
-                    border:'2px solid #ddd',
+                    border:'2px solid rgba(255, 182, 193, 0.5)',
                     borderRadius:'12px',
-                    background:'#fff'
+                    background:'transparent'
                   }} 
                   srcDoc={filledHtml} 
                 />
