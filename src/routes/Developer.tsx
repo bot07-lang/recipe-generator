@@ -119,8 +119,7 @@ export default function Developer() {
           <div style={{color:'#0c4a6e'}}>
             • Use <code style={{background:'#bae6fd', padding:'2px 6px', borderRadius:'4px'}}>{'{{KEY}}'}</code> format (recommended)<br/>
             • Also supports <code style={{background:'#bae6fd', padding:'2px 6px', borderRadius:'4px'}}>{'[KEY]'}</code> or plain <code style={{background:'#bae6fd', padding:'2px 6px', borderRadius:'4px'}}>KEY</code> format<br/>
-            • Placeholders are case-insensitive<br/>
-            • Click the chips below to copy placeholders to your HTML
+            • Placeholders are case-insensitive
           </div>
         </div>
         
