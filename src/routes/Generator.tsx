@@ -526,7 +526,8 @@ Calories: 320 per serving
               padding:'40px',
               display:'flex',
               justifyContent:'center',
-              alignItems:'flex-start'
+              alignItems:'flex-start',
+              background:'#fce4ec'
             }}>
               <div style={{
                 transform:'scale(0.75)',
