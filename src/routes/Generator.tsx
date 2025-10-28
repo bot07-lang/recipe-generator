@@ -340,6 +340,8 @@ Calories: 320 per serving
       tempDiv.style.position = 'absolute';
       tempDiv.style.left = '-9999px';
       tempDiv.style.top = '-9999px';
+      tempDiv.style.width = '1200px'; // Ensure horizontal layout (above 900px breakpoint)
+      tempDiv.style.minWidth = '1200px';
       document.body.appendChild(tempDiv);
 
       // Generate PNG using html2canvas
