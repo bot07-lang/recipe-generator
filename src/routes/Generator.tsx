@@ -429,18 +429,18 @@ Calories: 320 per serving
         )}
         <div className="form-group">
           <label>Select Template</label>
-          <select className="select" value={templateName} onChange={e=>{setTemplateName(e.target.value); const t = templates.find(tm => tm.name === e.target.value); if(t) setTemplateId(t.id);}}>
+          <select className="select" style={{marginTop:8}} value={templateName} onChange={e=>{setTemplateName(e.target.value); const t = templates.find(tm => tm.name === e.target.value); if(t) setTemplateId(t.id);}}>
             <option value="">Choose a beautiful template…</option>
             {templates.map(t=> <option key={t.id} value={t.name}>{t.name}</option>)}
           </select>
         </div>
         <div className="form-group">
           <label>Recipe Content <span style={{fontWeight:400,color:'#777',fontSize:12}}>(paste your content here)</span></label>
-          <textarea className="textarea" value={raw} onChange={e=>setRaw(e.target.value)} />
+          <textarea className="textarea" style={{marginTop:8}} value={raw} onChange={e=>setRaw(e.target.value)} />
         </div>
         <div className="form-group">
             <label>Recipe Image (Optional, max 10MB)</label>
-          <div className="dz" onClick={()=>document.getElementById('rg-file')?.click()}
+          <div className="dz" style={{marginTop:8}} onClick={()=>document.getElementById('rg-file')?.click()}
                onDragOver={e=>{e.preventDefault();}}
                onDrop={e=>{e.preventDefault(); const f=e.dataTransfer.files?.[0]; if (f) onFile(f);}}>
             Drag & drop an image or click to browse
