@@ -90,9 +90,9 @@ export default function Developer() {
       <div className="page-title">Developer Template Manager</div>
       <div className="shell-card">
         <div className="section-title">Template Manager</div>
-        <div className="form-group"><label>Template Name</label><input className="input" value={name} onChange={e=>setName(e.target.value)} /></div>
-        <div className="form-group"><label>Preview Image (Optional)</label>
-          <div className="dz" onClick={()=>document.getElementById('preview-file')?.click()}
+        <div className="form-group"><label style={{fontWeight:700}}>Template Name</label><input className="input" style={{marginTop:8}} value={name} onChange={e=>setName(e.target.value)} /></div>
+        <div className="form-group"><label style={{fontWeight:700}}>Preview Image (Optional)</label>
+          <div className="dz" style={{marginTop:8}} onClick={()=>document.getElementById('preview-file')?.click()}
                onDragOver={e=>{e.preventDefault();}}
                onDrop={e=>{e.preventDefault(); const f=e.dataTransfer.files?.[0]; if (f) handleImageUpload(f);}}>
             {previewImage ? (
@@ -104,7 +104,7 @@ export default function Developer() {
                    onChange={e=>{const f=(e.target as HTMLInputElement).files?.[0]; if (f) handleImageUpload(f);}} />
           </div>
         </div>
-        <div className="form-group"><label>HTML Template Code</label><textarea className="textarea" value={html} onChange={e=>setHtml(e.target.value)} /></div>
+        <div className="form-group"><label style={{fontWeight:700}}>HTML Template Code</label><textarea className="textarea" style={{marginTop:8}} value={html} onChange={e=>setHtml(e.target.value)} /></div>
         
         <div style={{
           background:'#e0f2fe',
