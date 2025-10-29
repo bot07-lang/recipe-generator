@@ -436,6 +436,7 @@ Calories: 320 per serving
         </div>
         <div className="form-group">
           <label>Recipe Content</label>
+          <div style={{fontSize:12,color:'#555',marginTop:4}}>Paste your content here</div>
           <textarea className="textarea" value={raw} onChange={e=>setRaw(e.target.value)} />
         </div>
         <div className="form-group">
