@@ -139,7 +139,7 @@ const ingredientsHtml = (arr?: string[]) => arr?.length ? `<ul class="ingredient
 const instructionsHtml = (arr?: string[]) => arr?.length ? `<ul class="instructions-list">${arr.map(i => `<li>${i}</li>`).join('')}</ul>` : '';
 
 // Replace any placeholders found in the html with data keys (case-insensitive)
-function fillPlaceholders(templateHtml: string, data: Record<string, any>, imageSrc: string | null): string {
+function fillPlaceholders(templateHtml: string, data: Record<string, any>, imageSrc: string | null, logoSrc?: string | null): string {
   let html = templateHtml;
   const map: Record<string, string> = {
     TITLE: data.title || '',
@@ -155,6 +155,8 @@ function fillPlaceholders(templateHtml: string, data: Record<string, any>, image
     DIRECTIONS: instructionsHtml(data.instructions), // Alternative key
     IMAGE: imageSrc || '',
     IMAGE_URL: imageSrc || '',
+    LOGO: logoSrc || '',
+    LOGO_URL: logoSrc || '',
     NOTES: data.notes || data.description || ''
   };
   
@@ -212,6 +214,7 @@ Calories: 320 per serving
 2. Mix wet ingredients and sugars.
 3. Combine with dry ingredients and bake 40-45 minutes.`);
   const [img, setImg] = useState<string | null>(null);
+  const [logoImg, setLogoImg] = useState<string | null>(null);
   const [generatedHtml, setGeneratedHtml] = useState('');
   const [pngUrl, setPngUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -300,9 +303,9 @@ Calories: 320 per serving
     if (!selected) return '';
     const source = normalizeForFlex(raw);
     const d = parseRecipeData(source);
-    const filled = fillPlaceholders(selected.html, d, img);
+    const filled = fillPlaceholders(selected.html, d, img, logoImg);
     return filled;
-  }, [selected, raw, img]);
+  }, [selected, raw, img, logoImg]);
 
   // Validate placeholders present in the selected template
   const missingPlaceholders = useMemo(() => {
@@ -331,6 +334,20 @@ Calories: 320 per serving
     }
     const reader = new FileReader();
     reader.onload = () => setImg(String(reader.result));
+    reader.readAsDataURL(f);
+  }
+
+  function onFileLogo(f: File) {
+    if (!f.type.startsWith('image/')) {
+      setNotification({ message: 'Please use an image file.', type: 'error' });
+      return;
+    }
+    if (f.size > 10 * 1024 * 1024) {
+      setNotification({ message: 'Image must be less than 10MB.', type: 'error' });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setLogoImg(String(reader.result));
     reader.readAsDataURL(f);
   }
 
@@ -470,6 +487,17 @@ Calories: 320 per serving
             <input id="rg-file" type="file" accept="image/*" style={{display:'none'}}
                    onChange={e=>{const f=(e.target as HTMLInputElement).files?.[0]; if (f) onFile(f);}} />
             {img && <div style={{marginTop:10}}><img src={img} style={{maxWidth:220,borderRadius:10}} /></div>}
+          </div>
+        </div>
+        <div className="form-group">
+            <label style={{fontWeight:700}}>Logo Image (Optional, max 10MB)</label>
+          <div className="dz" style={{marginTop:8}} onClick={()=>document.getElementById('rg-logo-file')?.click()}
+               onDragOver={e=>{e.preventDefault();}}
+               onDrop={e=>{e.preventDefault(); const f=e.dataTransfer.files?.[0]; if (f) onFileLogo(f);}}>
+            Drag & drop a logo or click to browse
+            <input id="rg-logo-file" type="file" accept="image/*" style={{display:'none'}}
+                   onChange={e=>{const f=(e.target as HTMLInputElement).files?.[0]; if (f) onFileLogo(f);}} />
+            {logoImg && <div style={{marginTop:10}}><img src={logoImg} style={{maxWidth:160,borderRadius:10,background:'#fff',padding:6}} /></div>}
           </div>
         </div>
         <div className="actions">
