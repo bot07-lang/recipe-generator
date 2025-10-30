@@ -182,11 +182,9 @@ function fillPlaceholders(templateHtml: string, data: Record<string, any>, image
     return data.instructions && data.instructions[index] ? data.instructions[index] : '';
   });
   
-  // Replace standalone KEY placeholders (without braces)
-  html = html.replace(/\b([A-Z_]+)\b/g, (m, keyRaw) => {
-    const key = String(keyRaw).toUpperCase();
-    return key in map ? map[key] : m;
-  });
+  // Note: intentionally NOT replacing standalone ALL-CAPS words without delimiters
+  // to avoid clobbering normal text like headings (e.g., "Ingredients", "Instructions").
+  // Use {{KEY}} or [KEY] placeholders instead.
   
   return html;
 }
