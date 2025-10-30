@@ -355,13 +355,27 @@ Calories: 320 per serving
       tempDiv.style.position = 'absolute';
       tempDiv.style.left = '-9999px';
       tempDiv.style.top = '-9999px';
-      tempDiv.style.width = '1000px'; // Match template's max-width (980px) + padding
-      tempDiv.style.minWidth = '1000px';
+      // Let the template define its own sizing to avoid distortion
       tempDiv.style.display = 'inline-block';
       document.body.appendChild(tempDiv);
 
-      // Wait for content to render
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait for content to render and all images to load
+      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise(resolve => {
+        const images = Array.from(tempDiv.querySelectorAll('img')) as HTMLImageElement[];
+        if (images.length === 0) return resolve(undefined);
+        let remaining = images.length;
+        images.forEach(imgEl => {
+          if (imgEl.complete) {
+            remaining -= 1;
+            if (remaining === 0) resolve(undefined);
+          } else {
+            const done = () => { remaining -= 1; if (remaining === 0) resolve(undefined); };
+            imgEl.onload = done;
+            imgEl.onerror = done;
+          }
+        });
+      });
       
       // Get the actual card element (without body padding)
       // Many templates use `.recipe-card`; fall back to `.card` or the container
