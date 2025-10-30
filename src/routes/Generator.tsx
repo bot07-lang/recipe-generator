@@ -364,10 +364,11 @@ Calories: 320 per serving
       await new Promise(resolve => setTimeout(resolve, 100));
       
       // Get the actual card element (without body padding)
-      const cardElement = tempDiv.querySelector('.card') as HTMLElement;
+      // Many templates use `.recipe-card`; fall back to `.card` or the container
+      const cardElement = (tempDiv.querySelector('.recipe-card') || tempDiv.querySelector('.card') || tempDiv) as HTMLElement;
       
       // Generate PNG using html2canvas on the card element directly
-      const canvas = await html2canvas(cardElement || tempDiv, {
+      const canvas = await html2canvas(cardElement, {
         backgroundColor: '#ffffff',
         scale: 1.2, // Lower scale for smaller file size, still good quality
         useCORS: true,
