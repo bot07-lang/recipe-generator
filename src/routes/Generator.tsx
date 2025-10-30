@@ -381,13 +381,23 @@ Calories: 320 per serving
       // Many templates use `.recipe-card`; fall back to `.card` or the container
       const cardElement = (tempDiv.querySelector('.recipe-card') || tempDiv.querySelector('.card') || tempDiv) as HTMLElement;
       
+      // Optionally constrain export width to a Canva-like size (keeps aspect ratio)
+      const exportWidth = 1080; // change if you want 1200/1920/etc.
+      const prevWidth = (cardElement as HTMLElement).style.width;
+      if (exportWidth) {
+        (cardElement as HTMLElement).style.width = `${exportWidth}px`;
+      }
+
       // Generate PNG using html2canvas on the card element directly
       const canvas = await html2canvas(cardElement, {
         backgroundColor: '#ffffff',
-        scale: 1.2, // Lower scale for smaller file size, still good quality
+        scale: 2, // increase scale for sharper output at fixed width
         useCORS: true,
         allowTaint: true
       });
+
+      // Restore original width after capture
+      (cardElement as HTMLElement).style.width = prevWidth;
 
       // Clean up
       document.body.removeChild(tempDiv);
