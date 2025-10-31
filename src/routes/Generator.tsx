@@ -219,6 +219,9 @@ Calories: 320 per serving
   const [pngUrl, setPngUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingTemplateHtml, setEditingTemplateHtml] = useState('');
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   // Input normalization: accept with or without ### section headers
   const selected = useMemo(() => {
@@ -307,6 +310,15 @@ Calories: 320 per serving
     return filled;
   }, [selected, raw, img, logoImg]);
 
+  // Preview of edited template HTML
+  const editedPreviewHtml = useMemo(() => {
+    if (!editingTemplateHtml) return '';
+    const source = normalizeForFlex(raw);
+    const d = parseRecipeData(source);
+    const filled = fillPlaceholders(editingTemplateHtml, d, img, logoImg);
+    return filled;
+  }, [editingTemplateHtml, raw, img, logoImg]);
+
   // Validate placeholders present in the selected template
   const missingPlaceholders = useMemo(() => {
     if (!selected) return [] as string[];
@@ -358,6 +370,42 @@ Calories: 320 per serving
     } catch (err) {
       console.error('Failed to copy:', err);
       setNotification({ message: 'Failed to copy HTML. Please try again.', type: 'error' });
+    }
+  }
+
+  function openEditModal() {
+    if (!selected) return;
+    setEditingTemplateHtml(selected.html);
+    setShowEditModal(true);
+  }
+
+  async function saveTemplate() {
+    if (!selected || !templateId) return;
+    
+    setIsSavingTemplate(true);
+    try {
+      const { error } = await supabase
+        .from('templates')
+        .update({
+          html: editingTemplateHtml,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', templateId);
+
+      if (error) {
+        throw error;
+      }
+
+      // Reload templates to reflect changes
+      await loadTemplates();
+      
+      setShowEditModal(false);
+      setNotification({ message: 'Template updated successfully!', type: 'success' });
+    } catch (err) {
+      console.error('Error saving template:', err);
+      setNotification({ message: 'Failed to save template. Please try again.', type: 'error' });
+    } finally {
+      setIsSavingTemplate(false);
     }
   }
 
@@ -469,10 +517,17 @@ Calories: 320 per serving
         )}
         <div className="form-group">
           <label style={{fontWeight:700}}>Select Template</label>
-          <select className="select" style={{marginTop:8}} value={templateName} onChange={e=>{setTemplateName(e.target.value); const t = templates.find(tm => tm.name === e.target.value); if(t) setTemplateId(t.id);}}>
-            <option value="">Choose a beautiful template…</option>
-            {templates.map(t=> <option key={t.id} value={t.name}>{t.name}</option>)}
-          </select>
+          <div style={{display:'flex', gap:8, alignItems:'flex-end'}}>
+            <select className="select" style={{marginTop:8, flex:1}} value={templateName} onChange={e=>{setTemplateName(e.target.value); const t = templates.find(tm => tm.name === e.target.value); if(t) setTemplateId(t.id);}}>
+              <option value="">Choose a beautiful template…</option>
+              {templates.map(t=> <option key={t.id} value={t.name}>{t.name}</option>)}
+            </select>
+            {selected && (
+              <button className="btn btn-secondary" onClick={openEditModal} style={{marginTop:8, whiteSpace:'nowrap'}}>
+                Edit Template
+              </button>
+            )}
+          </div>
         </div>
         <div className="form-group">
           <label style={{fontWeight:700}}>Recipe Content <span style={{fontWeight:400,color:'#777',fontSize:12}}>(paste your content here)</span></label>
@@ -619,6 +674,176 @@ Calories: 320 per serving
           </div>
         </div>
       )}
+
+      {/* Edit Template Modal */}
+      {showEditModal && selected && (
+        <div style={{
+          position:'fixed',
+          top:0,
+          left:0,
+          right:0,
+          bottom:0,
+          background:'rgba(0,0,0,0.7)',
+          display:'flex',
+          justifyContent:'center',
+          alignItems:'center',
+          zIndex:2000,
+          padding:'20px',
+          backdropFilter:'blur(6px)'
+        }} onClick={()=>setShowEditModal(false)}>
+          <div style={{
+            position:'relative',
+            background:'#fff',
+            borderRadius:'12px',
+            maxWidth:'95vw',
+            maxHeight:'95vh',
+            width:'1400px',
+            display:'flex',
+            flexDirection:'column',
+            boxShadow:'0 20px 60px rgba(0,0,0,0.3)'
+          }} onClick={(e)=>e.stopPropagation()}>
+            {/* Header */}
+            <div style={{
+              padding:'20px 24px',
+              borderBottom:'1px solid #e0e0e0',
+              display:'flex',
+              justifyContent:'space-between',
+              alignItems:'center'
+            }}>
+              <h2 style={{margin:0, fontSize:20, fontWeight:600}}>Edit Template: {selected.name}</h2>
+              <button 
+                onClick={()=>setShowEditModal(false)}
+                style={{
+                  background:'transparent',
+                  border:'none',
+                  fontSize:24,
+                  cursor:'pointer',
+                  color:'#666',
+                  width:32,
+                  height:32,
+                  display:'flex',
+                  alignItems:'center',
+                  justifyContent:'center',
+                  borderRadius:4
+                }}
+                onMouseOver={(e)=>{e.currentTarget.style.background='#f0f0f0';}}
+                onMouseOut={(e)=>{e.currentTarget.style.background='transparent';}}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Content - Split View */}
+            <div style={{
+              display:'flex',
+              flex:1,
+              overflow:'hidden',
+              minHeight:0
+            }}>
+              {/* Left: Code Editor */}
+              <div style={{
+                flex:'0 0 50%',
+                borderRight:'1px solid #e0e0e0',
+                display:'flex',
+                flexDirection:'column',
+                overflow:'hidden'
+              }}>
+                <div style={{
+                  padding:'12px 16px',
+                  background:'#f5f5f5',
+                  borderBottom:'1px solid #e0e0e0',
+                  fontSize:12,
+                  fontWeight:600,
+                  color:'#666'
+                }}>
+                  HTML Code
+                </div>
+                <textarea
+                  value={editingTemplateHtml}
+                  onChange={(e)=>setEditingTemplateHtml(e.target.value)}
+                  style={{
+                    flex:1,
+                    padding:16,
+                    border:'none',
+                    outline:'none',
+                    fontFamily:'monospace',
+                    fontSize:13,
+                    lineHeight:1.6,
+                    resize:'none',
+                    overflow:'auto'
+                  }}
+                  spellCheck={false}
+                />
+              </div>
+
+              {/* Right: Live Preview */}
+              <div style={{
+                flex:'0 0 50%',
+                display:'flex',
+                flexDirection:'column',
+                overflow:'hidden',
+                background:'#f9f9f9'
+              }}>
+                <div style={{
+                  padding:'12px 16px',
+                  background:'#f5f5f5',
+                  borderBottom:'1px solid #e0e0e0',
+                  fontSize:12,
+                  fontWeight:600,
+                  color:'#666'
+                }}>
+                  Live Preview
+                </div>
+                <div style={{
+                  flex:1,
+                  overflow:'auto',
+                  padding:20,
+                  display:'flex',
+                  justifyContent:'center',
+                  alignItems:'flex-start'
+                }}>
+                  <iframe 
+                    title="template-edit-preview" 
+                    style={{
+                      width:'100%',
+                      height:'100%',
+                      border:'1px solid #e0e0e0',
+                      borderRadius:8,
+                      background:'#fff'
+                    }} 
+                    srcDoc={editedPreviewHtml || '<div style="padding:20px;color:#999;">Edit HTML to see preview...</div>'} 
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div style={{
+              padding:'16px 24px',
+              borderTop:'1px solid #e0e0e0',
+              display:'flex',
+              justifyContent:'flex-end',
+              gap:12
+            }}>
+              <button 
+                className="btn btn-secondary"
+                onClick={()=>setShowEditModal(false)}
+                disabled={isSavingTemplate}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn"
+                onClick={saveTemplate}
+                disabled={isSavingTemplate}
+              >
+                {isSavingTemplate ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {notification && (
         <Notification 
           message={notification.message} 
