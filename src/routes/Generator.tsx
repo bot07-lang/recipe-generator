@@ -696,7 +696,7 @@ Calories: 320 per serving
             background:'#fff',
             borderRadius:'12px',
             maxWidth:'95vw',
-            maxHeight:'95vh',
+            height:'90vh',
             width:'1400px',
             display:'flex',
             flexDirection:'column',
@@ -767,10 +767,11 @@ Calories: 320 per serving
                     border:'none',
                     outline:'none',
                     fontFamily:'monospace',
-                    fontSize:13,
-                    lineHeight:1.6,
+                    fontSize:14,
+                    lineHeight:1.7,
                     resize:'none',
-                    overflow:'auto'
+                    overflow:'auto',
+                    minHeight:0
                   }}
                   spellCheck={false}
                 />
