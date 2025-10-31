@@ -979,9 +979,22 @@ Calories: 320 per serving
         }} onClick={()=>!isDeleting && setShowDeleteModal(false)}>
           <div style={{
             background:'#fff', borderRadius:12, width:'520px', maxWidth:'95vw',
-            boxShadow:'0 16px 48px rgba(0,0,0,.25)', overflow:'hidden'
+            boxShadow:'0 16px 48px rgba(0,0,0,.25)', overflow:'hidden', position:'relative'
           }} onClick={(e)=>e.stopPropagation()}>
             <div style={{padding:'18px 20px', borderBottom:'1px solid #eee', fontWeight:700}}>Delete Template</div>
+            <button 
+              onClick={()=>setShowDeleteModal(false)}
+              aria-label="Close"
+              style={{
+                position:'absolute', top:10, right:10, width:36, height:36,
+                border:'none', background:'#fff', borderRadius:'50%', cursor:'pointer',
+                boxShadow:'0 2px 8px rgba(0,0,0,0.08)'
+              }}
+              onMouseOver={(e)=>{e.currentTarget.style.background='#f3f3f3'}}
+              onMouseOut={(e)=>{e.currentTarget.style.background='#fff'}}
+            >
+              ×
+            </button>
             <div style={{padding:'18px 20px', color:'#333'}}>
               Are you sure you want to delete "{deletingTemplate.name}"? This action cannot be undone.
             </div>
