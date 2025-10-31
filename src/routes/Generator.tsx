@@ -580,18 +580,25 @@ Calories: 320 per serving
               <img src={getPreviewUrl(t)} alt={t.name} />
               <div className="gallery-name">{t.name}</div>
             </button>
-            {/* Delete icon */}
+            {/* Delete icon - floating half outside top-right */}
             <button
               title="Delete template"
               onClick={()=>{ setDeletingTemplate(t); setShowDeleteModal(true); }}
               style={{
-                position:'absolute', top:8, right:8, width:32, height:32,
-                borderRadius:8, background:'#fff', border:'1px solid #e5e5e5',
+                position:'absolute', top:-10, right:-10, width:36, height:36,
+                borderRadius:'50%', background:'#ffffff', border:'1px solid #e8e8e8',
                 display:'flex', alignItems:'center', justifyContent:'center',
-                boxShadow:'0 2px 6px rgba(0,0,0,0.08)', cursor:'pointer'
+                boxShadow:'0 6px 14px rgba(0,0,0,0.12)', cursor:'pointer',
+                zIndex:2
               }}
             >
-              <span role="img" aria-label="delete" style={{fontSize:16,color:'#b00020'}}>🗑️</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b00020" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                <path d="M10 11v6"/>
+                <path d="M14 11v6"/>
+                <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
+              </svg>
             </button>
           </div>
         ))}
