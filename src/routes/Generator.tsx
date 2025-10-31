@@ -806,16 +806,14 @@ Calories: 320 per serving
         }} onClick={()=>setShowEditModal(false)}>
           <div style={{
             position:'relative',
-            background:'rgba(255, 192, 203, 0.2)',
-            border:'1px solid rgba(255, 182, 193, 0.6)',
-            backdropFilter:'blur(10px) saturate(1.2)',
+            background:'#fff',
             borderRadius:'12px',
             maxWidth:'95vw',
             height:'90vh',
             width:'1400px',
             display:'flex',
             flexDirection:'column',
-            boxShadow:'0 20px 60px rgba(204, 43, 94, 0.25), 0 8px 20px rgba(0,0,0,0.15)'
+            boxShadow:'0 20px 60px rgba(0,0,0,0.3)'
           }} onClick={(e)=>e.stopPropagation()}>
             {/* Header */}
             <div style={{
