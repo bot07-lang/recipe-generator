@@ -138,10 +138,21 @@ function parseRecipeData(t: string) {
 
 const ingredientsHtml = (arr?: string[]) => arr?.length ? `<ul class="ingredients-list">${arr.map(i => `<li>${i}</li>`).join('')}</ul>` : '';
 const instructionsHtml = (arr?: string[]) => arr?.length ? `<ul class="instructions-list">${arr.map(i => `<li>${i}</li>`).join('')}</ul>` : '';
+const itemsOnlyHtml = (arr?: string[]) => arr?.length ? arr.map(i => `<li>${i}</li>`).join('') : '';
 
 // Replace any placeholders found in the html with data keys (case-insensitive)
 function fillPlaceholders(templateHtml: string, data: Record<string, any>, imageSrc: string | null, logoSrc?: string | null): string {
   let html = templateHtml;
+
+  // Detect if placeholders are inside developer-provided UL/OL wrappers
+  const isInsideList = (key: string) => {
+    const re = new RegExp(`<\s*(ul|ol)[^>]*>[\\s\\S]*?(\\{\\{\\s*${key}\\s*\\}\\}|\\[\\s*${key}\\s*\\])[\\s\\S]*?<\\/\\1>`, 'i');
+    return re.test(templateHtml);
+  };
+
+  const ingredientsInsideList = isInsideList('INGREDIENTS');
+  const instructionsInsideList = isInsideList('INSTRUCTIONS');
+
   const map: Record<string, string> = {
     TITLE: data.title || '',
     DESCRIPTION: data.description || '',
@@ -151,9 +162,11 @@ function fillPlaceholders(templateHtml: string, data: Record<string, any>, image
     DIFFICULTY: data.difficulty || '',
     CALORIES: data.calories || '',
     RATING: data.rating || '5', // Default rating
-    INGREDIENTS: ingredientsHtml(data.ingredients),
-    INSTRUCTIONS: instructionsHtml(data.instructions),
-    DIRECTIONS: instructionsHtml(data.instructions), // Alternative key
+    // If developer provided UL/OL around the placeholder, output only <li> items
+    // Otherwise, output our full list markup with default classes
+    INGREDIENTS: ingredientsInsideList ? itemsOnlyHtml(data.ingredients) : ingredientsHtml(data.ingredients),
+    INSTRUCTIONS: instructionsInsideList ? itemsOnlyHtml(data.instructions) : instructionsHtml(data.instructions),
+    DIRECTIONS: instructionsInsideList ? itemsOnlyHtml(data.instructions) : instructionsHtml(data.instructions), // Alternative key
     IMAGE: imageSrc || '',
     IMAGE_URL: imageSrc || '',
     LOGO: logoSrc || '',
