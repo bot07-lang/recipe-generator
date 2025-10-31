@@ -265,13 +265,28 @@ Calories: 320 per serving
     if (!url) return null;
     try {
       const u = new URL(url);
-      // Expect pattern: /storage/v1/object/public/<bucket>/<path>
+      // Supported patterns: public, sign, or direct object
       const parts = u.pathname.split('/');
-      const idx = parts.findIndex(p => p === 'public');
-      if (idx >= 0 && parts[idx + 1]) {
-        const bucket = parts[idx + 1];
-        const path = parts.slice(idx + 2).join('/');
-        if (bucket && path) return { bucket, path };
+      const idxPublic = parts.findIndex(p => p === 'public');
+      const idxSign = parts.findIndex(p => p === 'sign');
+      let bucket = '';
+      let path = '';
+      if (idxPublic >= 0 && parts[idxPublic + 1]) {
+        bucket = parts[idxPublic + 1];
+        path = parts.slice(idxPublic + 2).join('/');
+      } else if (idxSign >= 0 && parts[idxSign + 1]) {
+        bucket = parts[idxSign + 1];
+        path = parts.slice(idxSign + 2).join('/');
+      } else {
+        const idxObj = parts.findIndex(p => p === 'object');
+        if (idxObj >= 0 && parts[idxObj + 1]) {
+          bucket = parts[idxObj + 1];
+          path = parts.slice(idxObj + 2).join('/');
+        }
+      }
+      if (bucket && path) {
+        path = decodeURIComponent(path.replace(/^\//, ''));
+        return { bucket, path };
       }
     } catch { /* ignore */ }
     return null;
@@ -291,11 +306,11 @@ Calories: 320 per serving
       // Attempt to delete preview image if it's in our Supabase storage
       const storageRef = extractSupabaseStoragePath(deletingTemplate.preview_image_url);
       if (storageRef) {
-        try {
-          await supabase.storage.from(storageRef.bucket).remove([storageRef.path]);
-        } catch (e) {
-          // Non-fatal if image remove fails
-          console.warn('Preview image remove failed:', e);
+        const { error: removeError } = await supabase.storage
+          .from(storageRef.bucket)
+          .remove([storageRef.path]);
+        if (removeError) {
+          console.warn('Preview image remove failed:', removeError, storageRef);
         }
       }
 
