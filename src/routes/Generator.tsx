@@ -236,6 +236,7 @@ Calories: 320 per serving
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingTemplateHtml, setEditingTemplateHtml] = useState('');
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const [showConfirmSave, setShowConfirmSave] = useState(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   // Input normalization: accept with or without ### section headers
   const selected = useMemo(() => {
@@ -853,11 +854,34 @@ Calories: 320 per serving
               </button>
               <button 
                 className="btn"
-                onClick={saveTemplate}
+                onClick={()=>setShowConfirmSave(true)}
                 disabled={isSavingTemplate}
               >
                 {isSavingTemplate ? 'Saving...' : 'Save Changes'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Save Modal */}
+      {showConfirmSave && selected && (
+        <div style={{
+          position:'fixed', top:0, left:0, right:0, bottom:0,
+          background:'rgba(0,0,0,0.6)', display:'flex', justifyContent:'center', alignItems:'center',
+          zIndex:3000, padding:'20px', backdropFilter:'blur(4px)'
+        }} onClick={()=>!isSavingTemplate && setShowConfirmSave(false)}>
+          <div style={{
+            background:'#fff', borderRadius:12, width:'520px', maxWidth:'95vw',
+            boxShadow:'0 16px 48px rgba(0,0,0,.25)', overflow:'hidden'
+          }} onClick={(e)=>e.stopPropagation()}>
+            <div style={{padding:'18px 20px', borderBottom:'1px solid #eee', fontWeight:700}}>Confirm Save</div>
+            <div style={{padding:'18px 20px', color:'#333'}}>
+              You are about to overwrite the template "{selected.name}" with your edits. This action cannot be undone.
+            </div>
+            <div style={{display:'flex', justifyContent:'flex-end', gap:10, padding:'14px 20px', borderTop:'1px solid #eee'}}>
+              <button className="btn btn-secondary" onClick={()=>setShowConfirmSave(false)} disabled={isSavingTemplate}>Cancel</button>
+              <button className="btn" onClick={async ()=>{ setShowConfirmSave(false); await saveTemplate(); }} disabled={isSavingTemplate}>{isSavingTemplate ? 'Saving...' : 'Confirm & Save'}</button>
             </div>
           </div>
         </div>
