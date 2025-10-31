@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import html2canvas from 'html2canvas';
+import Editor from '@monaco-editor/react';
 import { supabase, Template } from '../supabase';
 import Notification from '../components/Notification';
 
@@ -758,23 +759,27 @@ Calories: 320 per serving
                 }}>
                   HTML Code
                 </div>
-                <textarea
-                  value={editingTemplateHtml}
-                  onChange={(e)=>setEditingTemplateHtml(e.target.value)}
-                  style={{
-                    flex:1,
-                    padding:16,
-                    border:'none',
-                    outline:'none',
-                    fontFamily:'monospace',
-                    fontSize:14,
-                    lineHeight:1.7,
-                    resize:'none',
-                    overflow:'auto',
-                    minHeight:0
-                  }}
-                  spellCheck={false}
-                />
+                <div style={{flex:1, minHeight:0, overflow:'hidden'}}>
+                  <Editor
+                    height="100%"
+                    defaultLanguage="html"
+                    value={editingTemplateHtml}
+                    onChange={(value) => setEditingTemplateHtml(value || '')}
+                    theme="vs-light"
+                    options={{
+                      minimap: { enabled: true },
+                      fontSize: 14,
+                      wordWrap: 'on',
+                      automaticLayout: true,
+                      scrollBeyondLastLine: false,
+                      formatOnPaste: true,
+                      formatOnType: true,
+                      tabSize: 2,
+                      lineNumbers: 'on',
+                      folding: true
+                    }}
+                  />
+                </div>
               </div>
 
               {/* Right: Live Preview */}
