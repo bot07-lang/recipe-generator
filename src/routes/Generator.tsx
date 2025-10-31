@@ -585,12 +585,15 @@ Calories: 320 per serving
               title="Delete template"
               onClick={()=>{ setDeletingTemplate(t); setShowDeleteModal(true); }}
               style={{
-                position:'absolute', top:-10, right:-10, width:36, height:36,
+                position:'absolute', top:8, right:8, width:34, height:34,
                 borderRadius:'50%', background:'#ffffff', border:'1px solid #e8e8e8',
                 display:'flex', alignItems:'center', justifyContent:'center',
-                boxShadow:'0 6px 14px rgba(0,0,0,0.12)', cursor:'pointer',
-                zIndex:2
+                boxShadow:'0 4px 10px rgba(0,0,0,0.10)', cursor:'pointer',
+                zIndex:2,
+                transition:'all .15s ease'
               }}
+              onMouseOver={(e)=>{(e.currentTarget as HTMLButtonElement).style.background='#fff2f3'; (e.currentTarget as HTMLButtonElement).style.borderColor='#ffcdd2'; (e.currentTarget as HTMLButtonElement).style.transform='scale(1.06)';}}
+              onMouseOut={(e)=>{(e.currentTarget as HTMLButtonElement).style.background='#ffffff'; (e.currentTarget as HTMLButtonElement).style.borderColor='#e8e8e8'; (e.currentTarget as HTMLButtonElement).style.transform='scale(1)';}}
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b00020" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="3 6 5 6 21 6"/>
