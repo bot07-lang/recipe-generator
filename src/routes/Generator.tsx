@@ -218,8 +218,8 @@ function fillPlaceholders(templateHtml: string, data: Record<string, any>, image
   const map: Record<string, string> = {
     TITLE: data.title || '',
     DESCRIPTION: data.description || '',
-    COOK_TIME: data.cook_time_min || '',
-    TIME: data.cook_time_min || '', // Alternative key
+    COOK_TIME: data.total_time_min || data.cook_time_min || '', // Show Total Duration, fallback to Cooking Time
+    TIME: data.total_time_min || data.cook_time_min || '', // Alternative key - Show Total Duration, fallback to Cooking Time
     PREP_TIME: data.prep_time_min || '',
     PREPARATION_TIME: data.prep_time_min || '',
     REST_TIME: data.rest_time_min || '',
