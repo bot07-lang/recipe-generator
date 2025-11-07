@@ -41,6 +41,8 @@ function getFieldBlock(text: string, label: string): string {
 }
 
 function getSection(text: string, keyword: string): string {
+  // Handle both formats: ### Ingredients and ### :emoji: Ingredients
+  // Match ### followed by optional emoji/prefix, then keyword, then content until next ### or end
   const re = new RegExp(`###[\\s\\S]*?${keyword}[\\s\\S]*?\\n?([\\s\\S]*?)(?=###|$)`, "i");
   const m = text.match(re);
   return m ? m[1].trim() : "";
@@ -48,22 +50,38 @@ function getSection(text: string, keyword: string): string {
 
 function cleanIngredients(text = ""): string[] {
   let t = text.replace(/^\s*•\s*/, "");
-  t = t.replace(/(?:Ingredient\s*Title\s*:)?\s*Ingredients\s*:\s*/i, "").trim();
-  t = t.replace(/\s+/g, " ");
+  
+  // Remove "Ingredient Title: ..." lines (can appear multiple times)
+  t = t.replace(/^Ingredient\s*Title\s*:.*$/gim, "");
+  
+  // Remove "Ingredients:" label if present
+  t = t.replace(/^Ingredients\s*:\s*/gim, "").trim();
+  
+  // Split by lines first to handle | separators properly
+  const lines = t.split('\n').map(line => line.trim()).filter(Boolean);
+  
+  const parts: string[] = [];
+  for (const line of lines) {
+    // Handle | separator: "2 cloves garlic | minced" -> keep as "2 cloves garlic | minced" or split
+    // For now, keep the full line including | separator
+    if (line.includes('|')) {
+      parts.push(line);
+    } else {
+      // Split by comma if no | separator
+      const commaParts = line.split(',').map(s => s.trim()).filter(Boolean);
+      parts.push(...commaParts);
+    }
+  }
 
-  // add separators before quantity patterns like "1 ", "½ ", etc.
-  t = t.replace(/(?<!,)\s(?=(?:\d+(?:-\d+)?|[¼½¾])(?:\s|\())/g, " |SEP| ");
-
-  const parts = t
-    .split(/,\s*| \|SEP\| /g)
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  return parts;
+  return parts.filter(Boolean);
 }
 
 function cleanDirections(text = ""): string[] {
-  let t = text.replace(/^Instructions\s*:\s*/i, "").trim();
+  // Remove "Instructions Section Title: ..." lines
+  let t = text.replace(/^Instructions\s*Section\s*Title\s*:.*$/gim, "");
+  
+  // Remove "Instructions:" label if present
+  t = t.replace(/^Instructions\s*:\s*/gim, "").trim();
 
   // normalize any existing multiple newlines to one
   t = t.replace(/\n{2,}/g, "\n");
@@ -378,12 +396,13 @@ Calories: 320 per serving
   // Light normalizer that only runs in test mode to add missing headers
   function normalizeForFlex(text: string): string {
     let out = text;
-    // Convert # or ### to our expected ### form
-    out = out.replace(/^\s*#{1,3}\s*ingredients\s*:?[\t ]*$/gim, '### Ingredients');
-    out = out.replace(/^\s*#{1,3}\s*instructions\s*:?[\t ]*$/gim, '### Instructions');
+    // Convert # or ### to our expected ### form (handles emoji prefixes like :carrot:, :book:)
+    // Pattern: ### followed by any characters (including emojis), then keyword
+    out = out.replace(/^\s*#{1,3}\s*.*?ingredients\s*:?[\t ]*$/gim, '### Ingredients');
+    out = out.replace(/^\s*#{1,3}\s*.*?instructions\s*:?[\t ]*$/gim, '### Instructions');
     // Optional sections
-    out = out.replace(/^\s*#{1,3}\s*equipment\s*:?[\t ]*$/gim, '### Equipment');
-    out = out.replace(/^\s*#{1,3}\s*nutrition(?:\s*facts)?\s*:?[\t ]*$/gim, '### Nutrition');
+    out = out.replace(/^\s*#{1,3}\s*.*?equipment\s*:?[\t ]*$/gim, '### Equipment');
+    out = out.replace(/^\s*#{1,3}\s*.*?nutrition(?:\s*facts)?\s*:?[\t ]*$/gim, '### Nutrition');
     // Also convert standalone headings (no # at all)
     out = out.replace(/^\s*ingredients\s*:?[\t ]*$/gim, '### Ingredients');
     out = out.replace(/^\s*instructions\s*:?[\t ]*$/gim, '### Instructions');
