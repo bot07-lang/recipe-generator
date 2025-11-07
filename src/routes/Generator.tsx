@@ -42,10 +42,43 @@ function getFieldBlock(text: string, label: string): string {
 
 function getSection(text: string, keyword: string): string {
   // Handle both formats: ### Ingredients and ### :emoji: Ingredients
-  // Match ### followed by optional emoji/prefix, then keyword, then content until next ### or end
-  const re = new RegExp(`###[\\s\\S]*?${keyword}[\\s\\S]*?\\n?([\\s\\S]*?)(?=###|$)`, "i");
-  const m = text.match(re);
-  return m ? m[1].trim() : "";
+  // Match ### followed by optional emoji/prefix, then keyword, then capture content until next ### or end
+  const lines = text.split('\n');
+  let inSection = false;
+  let content: string[] = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Check if this line starts a section with our keyword
+    if (/^###\s*.*?ingredients/i.test(line) && keyword.toLowerCase() === 'ingredients') {
+      inSection = true;
+      continue;
+    }
+    if (/^###\s*.*?instructions/i.test(line) && keyword.toLowerCase() === 'instructions') {
+      inSection = true;
+      continue;
+    }
+    if (/^###\s*.*?equipment/i.test(line) && keyword.toLowerCase() === 'equipment') {
+      inSection = true;
+      continue;
+    }
+    if (/^###\s*.*?nutrition/i.test(line) && keyword.toLowerCase() === 'nutrition') {
+      inSection = true;
+      continue;
+    }
+    
+    // If we're in the section and hit another ###, stop
+    if (inSection && /^###/.test(line)) {
+      break;
+    }
+    
+    // Collect content while in section
+    if (inSection) {
+      content.push(line);
+    }
+  }
+  
+  return content.join('\n').trim();
 }
 
 function cleanIngredients(text = ""): string[] {
