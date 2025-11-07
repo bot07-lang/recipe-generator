@@ -222,6 +222,11 @@ function fillPlaceholders(templateHtml: string, data: Record<string, any>, image
     DESCRIPTION: data.description || '',
     COOK_TIME: data.cook_time_min || '',
     TIME: data.cook_time_min || '', // Alternative key
+    PREP_TIME: data.prep_time_min || '',
+    PREPARATION_TIME: data.prep_time_min || '',
+    REST_TIME: data.rest_time_min || '',
+    TOTAL_DURATION: data.total_time_min || '',
+    TOTAL_TIME: data.total_time_min || '',
     SERVINGS: data.servings || '',
     DIFFICULTY: data.difficulty || '',
     CALORIES: data.calories || '',
