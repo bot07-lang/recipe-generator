@@ -43,6 +43,15 @@ function getFieldBlock(text: string, label: string): string {
     return m ? m[1].trim() : "";
   }
   
+  // For Recipe Description, handle specially to capture full multi-line content
+  if (label.includes('Recipe Description')) {
+    const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Match until next field label (must be at start of line) or ### section
+    const re = new RegExp(`${escapedLabel}:\\s*([\\s\\S]*?)(?=\\n(?:Recipe |Difficulty|No\\.|Preparation|Cooking|Rest|Total|Cooking Temp|Calories|Best Season|###)|\\n###|$)`, "i");
+    const m = text.match(re);
+    return m ? m[1].trim() : "";
+  }
+  
   // For other fields, escape special regex chars in label
   const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const lookaheadPattern = '(Recipe |Difficulty|No\\.|Preparation|Cooking|Rest|Total|Cooking Temp|Calories|Best Season|###|$)';
