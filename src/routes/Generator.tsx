@@ -35,18 +35,16 @@ const DEFAULT_TEMPLATES: Template[] = [
 ];
 
 function getFieldBlock(text: string, label: string): string {
-  // Escape special regex chars in label
-  const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  
-  // For Total Duration, use a pattern that stops at next field or end, but doesn't stop at just "Total"
+  // For Total Duration, handle specially to avoid double-escaping issues
   if (label.includes('Total Duration')) {
-    // Match the value on the same line (everything after colon until newline)
-    const re = new RegExp(`${escapedLabel}:\\s*([^\\n]+)`, "i");
+    // Match "Total Duration (Minutes):" followed by value on same line
+    const re = new RegExp(`Total\\s+Duration\\s+\\(Minutes\\):\\s*([^\\n]+)`, "i");
     const m = text.match(re);
     return m ? m[1].trim() : "";
   }
   
-  // For other fields, use standard pattern
+  // For other fields, escape special regex chars in label
+  const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const lookaheadPattern = '(Recipe |Difficulty|No\\.|Preparation|Cooking|Rest|Total|Cooking Temp|Calories|Best Season|###|$)';
   const re = new RegExp(`${escapedLabel}:\\s*([\\s\\S]*?)(?=${lookaheadPattern})`, "i");
   const m = text.match(re);
