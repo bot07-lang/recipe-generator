@@ -35,7 +35,13 @@ const DEFAULT_TEMPLATES: Template[] = [
 ];
 
 function getFieldBlock(text: string, label: string): string {
-  const re = new RegExp(`${label}:\\s*([\\s\\S]*?)(?=(Recipe |Difficulty|No\\.|Preparation|Cooking|Rest|Total|Cooking Temp|Calories|Best Season|###|$))`, "i");
+  // Escape special regex chars in label, but handle "Total Duration" specially to avoid stopping at "Total"
+  const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // For "Total Duration", use a more specific lookahead to avoid matching "Total" alone
+  const lookahead = label.includes('Total Duration') 
+    ? '(?=(Recipe |Difficulty|No\\.|Preparation|Cooking|Rest|Cooking Temp|Calories|Best Season|###|$))'
+    : '(?=(Recipe |Difficulty|No\\.|Preparation|Cooking|Rest|Total|Cooking Temp|Calories|Best Season|###|$))';
+  const re = new RegExp(`${escapedLabel}:\\s*([\\s\\S]*?)${lookahead}`, "i");
   const m = text.match(re);
   return m ? m[1].trim() : "";
 }
@@ -172,7 +178,7 @@ function parseRecipeData(t: string) {
     title: title || "Untitled Recipe",
     description,
     difficulty,
-    servings,
+    servings: servings || "4", // Default to 4 if not provided
     prep_time_min: prep,
     cook_time_min: cook,
     rest_time_min: rest,
