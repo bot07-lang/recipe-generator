@@ -311,6 +311,9 @@ Calories: 320 per serving
   const [showPreview, setShowPreview] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingTemplateHtml, setEditingTemplateHtml] = useState('');
+  const [editingTemplateName, setEditingTemplateName] = useState('');
+  const [editingPreviewImage, setEditingPreviewImage] = useState<string | null>(null);
+  const [editingPreviewImageFile, setEditingPreviewImageFile] = useState<File | null>(null);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [showConfirmSave, setShowConfirmSave] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -557,7 +560,25 @@ Calories: 320 per serving
   function openEditModal() {
     if (!selected) return;
     setEditingTemplateHtml(selected.html);
+    setEditingTemplateName(selected.name);
+    setEditingPreviewImage(selected.preview_image_url);
+    setEditingPreviewImageFile(null);
     setShowEditModal(true);
+  }
+
+  function onEditPreviewImage(f: File) {
+    if (!f.type.startsWith('image/')) {
+      setNotification({ message: 'Please use an image file.', type: 'error' });
+      return;
+    }
+    if (f.size > 10 * 1024 * 1024) {
+      setNotification({ message: 'Image must be less than 10MB.', type: 'error' });
+      return;
+    }
+    setEditingPreviewImageFile(f);
+    const reader = new FileReader();
+    reader.onload = () => setEditingPreviewImage(String(reader.result));
+    reader.readAsDataURL(f);
   }
 
   async function saveTemplate() {
@@ -565,10 +586,72 @@ Calories: 320 per serving
     
     setIsSavingTemplate(true);
     try {
+      let previewImageUrl = selected.preview_image_url;
+      
+      // Handle preview image removal (if it was removed)
+      if (!editingPreviewImage && selected.preview_image_url && !editingPreviewImageFile) {
+        // User removed the preview image - delete from storage
+        const storageRef = extractSupabaseStoragePath(selected.preview_image_url);
+        if (storageRef) {
+          try {
+            await supabase.storage.from(storageRef.bucket).remove([storageRef.path]);
+          } catch (e) {
+            console.warn('Failed to delete preview image:', e);
+          }
+        }
+        previewImageUrl = null;
+      }
+      
+      // Upload new preview image if provided
+      if (editingPreviewImageFile) {
+        const fileExt = editingPreviewImageFile.name.split('.').pop() || 'png';
+        const fileName = `template-${templateId}-${Date.now()}.${fileExt}`;
+        
+        // Convert data URL to blob if needed, or use file directly
+        let blob: Blob;
+        if (editingPreviewImage?.startsWith('data:')) {
+          const response = await fetch(editingPreviewImage);
+          blob = await response.blob();
+        } else {
+          blob = editingPreviewImageFile;
+        }
+        
+        // Delete old preview image if it exists
+        if (selected.preview_image_url) {
+          const storageRef = extractSupabaseStoragePath(selected.preview_image_url);
+          if (storageRef) {
+            try {
+              await supabase.storage.from(storageRef.bucket).remove([storageRef.path]);
+            } catch (e) {
+              console.warn('Failed to delete old preview image:', e);
+            }
+          }
+        }
+        
+        // Upload new image
+        const { error: uploadError } = await supabase.storage
+          .from('template-previews')
+          .upload(fileName, blob, { upsert: true });
+
+        if (uploadError) {
+          console.error('Error uploading preview image:', uploadError);
+          setNotification({ message: 'Error uploading preview image. Template saved without image update.', type: 'error' });
+        } else {
+          // Get public URL
+          const { data: urlData } = supabase.storage
+            .from('template-previews')
+            .getPublicUrl(fileName);
+          previewImageUrl = urlData.publicUrl;
+        }
+      }
+
+      // Update template with name, HTML, and preview image
       const { error } = await supabase
         .from('templates')
         .update({
+          name: editingTemplateName,
           html: editingTemplateHtml,
+          preview_image_url: previewImageUrl,
           updated_at: new Date().toISOString()
         })
         .eq('id', templateId);
@@ -579,6 +662,11 @@ Calories: 320 per serving
 
       // Reload templates to reflect changes
       await loadTemplates();
+      
+      // Update selected template name if it changed
+      if (editingTemplateName !== selected.name) {
+        setTemplateName(editingTemplateName);
+      }
       
       setShowEditModal(false);
       setNotification({ message: 'Template updated successfully!', type: 'success' });
@@ -935,7 +1023,7 @@ Calories: 320 per serving
               justifyContent:'space-between',
               alignItems:'center'
             }}>
-              <h2 style={{margin:0, fontSize:20, fontWeight:600}}>Edit Template: {selected.name}</h2>
+              <h2 style={{margin:0, fontSize:20, fontWeight:600}}>Edit Template</h2>
               <button 
                 onClick={()=>setShowEditModal(false)}
                 style={{
@@ -956,6 +1044,97 @@ Calories: 320 per serving
               >
                 ×
               </button>
+            </div>
+
+            {/* Template Name and Preview Image Section */}
+            <div style={{
+              padding:'16px 24px',
+              borderBottom:'1px solid #e0e0e0',
+              background:'#fafafa',
+              display:'flex',
+              gap:20,
+              alignItems:'flex-start'
+            }}>
+              <div style={{flex:1}}>
+                <label style={{display:'block', fontWeight:600, marginBottom:8, fontSize:14}}>
+                  Template Name
+                </label>
+                <input
+                  type="text"
+                  value={editingTemplateName}
+                  onChange={(e) => setEditingTemplateName(e.target.value)}
+                  style={{
+                    width:'100%',
+                    padding:'10px 12px',
+                    border:'1px solid #ddd',
+                    borderRadius:6,
+                    fontSize:14,
+                    fontFamily:'inherit'
+                  }}
+                  placeholder="Enter template name"
+                />
+              </div>
+              <div style={{flex:1}}>
+                <label style={{display:'block', fontWeight:600, marginBottom:8, fontSize:14}}>
+                  Preview Image (Cover Pic)
+                </label>
+                <div style={{display:'flex', gap:12, alignItems:'center'}}>
+                  {editingPreviewImage && (
+                    <img 
+                      src={editingPreviewImage} 
+                      alt="Preview" 
+                      style={{
+                        width:80,
+                        height:80,
+                        objectFit:'cover',
+                        borderRadius:6,
+                        border:'1px solid #ddd'
+                      }}
+                    />
+                  )}
+                  <label style={{
+                    padding:'10px 16px',
+                    background:'#007bff',
+                    color:'white',
+                    borderRadius:6,
+                    cursor:'pointer',
+                    fontSize:14,
+                    fontWeight:500,
+                    display:'inline-block'
+                  }}>
+                    {editingPreviewImage ? 'Change Image' : 'Upload Image'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{display:'none'}}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) onEditPreviewImage(file);
+                      }}
+                    />
+                  </label>
+                  {editingPreviewImage && (
+                    <button
+                      onClick={() => {
+                        setEditingPreviewImage(null);
+                        setEditingPreviewImageFile(null);
+                      }}
+                      style={{
+                        padding:'10px 16px',
+                        background:'#dc3545',
+                        color:'white',
+                        border:'none',
+                        borderRadius:6,
+                        cursor:'pointer',
+                        fontSize:14,
+                        fontWeight:500
+                      }}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Content - Split View */}
