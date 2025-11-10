@@ -1060,7 +1060,7 @@ Calories: 320 per serving
             }}>
               <div style={{flex:1}}>
                 <label style={{display:'block', fontWeight:600, marginBottom:8, fontSize:14}}>
-                  Template Name
+                  Change Temp Name
                 </label>
                 <input
                   type="text"
