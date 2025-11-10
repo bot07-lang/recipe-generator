@@ -409,6 +409,22 @@ Calories: 320 per serving
 
   useEffect(() => {
     loadTemplates();
+    
+    // Reload templates when page becomes visible after being hidden
+    // (helps when new templates are added in Developer page)
+    let wasHidden = document.hidden;
+    const handleVisibilityChange = () => {
+      if (wasHidden && !document.hidden) {
+        // Page was hidden and now visible - reload templates
+        loadTemplates();
+      }
+      wasHidden = document.hidden;
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   async function loadTemplates() {
@@ -668,14 +684,33 @@ Calories: 320 per serving
       <div className="gallery">
         {templates.map(t => (
           <div key={t.id} className={`gallery-card ${(templateId === t.id || templateName === t.name) ? 'selected' : ''}`} style={{position:'relative'}}>
-            <button style={{all:'unset',cursor:'pointer',display:'block'}} onClick={()=>{setTemplateId(t.id); setTemplateName(t.name);}}>
+            <button 
+              style={{all:'unset',cursor:'pointer',display:'block',width:'100%'}} 
+              onClick={(e)=>{
+                e.preventDefault();
+                e.stopPropagation();
+                // Set templateName first, then templateId (matching dropdown behavior)
+                setTemplateName(t.name);
+                const foundTemplate = templates.find(tm => tm.name === t.name);
+                if (foundTemplate) {
+                  setTemplateId(foundTemplate.id);
+                } else {
+                  setTemplateId(t.id);
+                }
+              }}
+            >
               <img src={getPreviewUrl(t)} alt={t.name} />
               <div className="gallery-name">{t.name}</div>
             </button>
             {/* Delete icon - floating half outside top-right */}
             <button
               title="Delete template"
-              onClick={()=>{ setDeletingTemplate(t); setShowDeleteModal(true); }}
+              onClick={(e)=>{
+                e.preventDefault();
+                e.stopPropagation();
+                setDeletingTemplate(t);
+                setShowDeleteModal(true);
+              }}
               style={{
                 position:'absolute', top:8, right:8, width:34, height:34,
                 borderRadius:'50%', background:'#ffffff', border:'1px solid #e8e8e8',
