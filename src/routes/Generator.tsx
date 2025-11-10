@@ -47,14 +47,14 @@ function getFieldBlock(text: string, label: string): string {
   if (label.includes('Recipe Description')) {
     const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     // Match until next field label (must be at start of line) or ### section
-    const re = new RegExp(`${escapedLabel}:\\s*([\\s\\S]*?)(?=\\n(?:Recipe |Difficulty|No\\.|Preparation|Cooking|Rest|Total|Cooking Temp|Calories|Best Season|###)|\\n###|$)`, "i");
+    const re = new RegExp(`${escapedLabel}:\\s*([\\s\\S]*?)(?=\\n(?:Recipe |Difficulty|No\\.|Preparation|Cooking|Rest|Total|Cooking Temp|Calories|Best Season|Website|###)|\\n###|$)`, "i");
     const m = text.match(re);
     return m ? m[1].trim() : "";
   }
   
   // For other fields, escape special regex chars in label
   const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const lookaheadPattern = '(Recipe |Difficulty|No\\.|Preparation|Cooking|Rest|Total|Cooking Temp|Calories|Best Season|###|$)';
+  const lookaheadPattern = '(Recipe |Difficulty|No\\.|Preparation|Cooking|Rest|Total|Cooking Temp|Calories|Best Season|Website|###|$)';
   const re = new RegExp(`${escapedLabel}:\\s*([\\s\\S]*?)(?=${lookaheadPattern})`, "i");
   const m = text.match(re);
   return m ? m[1].trim() : "";
@@ -173,6 +173,7 @@ function parseRecipeData(t: string) {
   const temp        = getFieldBlock(t, "Cooking Temp \\([^)]*\\)");
   let calories      = getFieldBlock(t, "Calories");
   const season      = getFieldBlock(t, "Best Season");
+  const website     = getFieldBlock(t, "Website");
 
   calories = calories.replace(/\bper\s*serving\b/i, "").trim();
 
@@ -200,6 +201,7 @@ function parseRecipeData(t: string) {
     temperature: temp,
     calories,
     season,
+    website,
     ingredients, // Array of clean ingredients
     instructions, // Array of clean instructions
     equipment,
@@ -238,6 +240,7 @@ function fillPlaceholders(templateHtml: string, data: Record<string, any>, image
     DIFFICULTY: data.difficulty || '',
     CALORIES: data.calories || '',
     RATING: data.rating || '5', // Default rating
+    WEBSITE: data.website || '',
     // If developer provided UL/OL around the placeholder, output only <li> items
     // Otherwise, output our full list markup with default classes
     INGREDIENTS: ingredientsInsideList ? itemsOnlyHtml(data.ingredients) : ingredientsHtml(data.ingredients),
