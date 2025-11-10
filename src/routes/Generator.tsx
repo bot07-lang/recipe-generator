@@ -43,19 +43,28 @@ function getFieldBlock(text: string, label: string): string {
     return m ? m[1].trim() : "";
   }
   
+  // For Preparation Time, handle specially to avoid lookahead issues
+  if (label.includes('Preparation Time')) {
+    // Match "Preparation Time (Minutes):" followed by value on same line
+    const re = new RegExp(`Preparation\\s+Time\\s+\\(Minutes\\):\\s*([^\\n]+)`, "i");
+    const m = text.match(re);
+    return m ? m[1].trim() : "";
+  }
+  
   // For Recipe Description, handle specially to capture full multi-line content
   if (label.includes('Recipe Description')) {
     const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     // Match until next field label (must be at start of line) or ### section
-    const re = new RegExp(`${escapedLabel}:\\s*([\\s\\S]*?)(?=\\n(?:Recipe |Difficulty|No\\.|Preparation|Cooking|Rest|Total|Cooking Temp|Calories|Best Season|Website|###)|\\n###|$)`, "i");
+    const re = new RegExp(`${escapedLabel}:\\s*([\\s\\S]*?)(?=\\n(?:Recipe |Difficulty|No\\.|Preparation\\s+Time|Cooking|Rest|Total|Cooking Temp|Calories|Best Season|Website|###)|\\n###|$)`, "i");
     const m = text.match(re);
     return m ? m[1].trim() : "";
   }
   
   // For other fields, escape special regex chars in label
   const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const lookaheadPattern = '(Recipe |Difficulty|No\\.|Preparation|Cooking|Rest|Total|Cooking Temp|Calories|Best Season|Website|###|$)';
-  const re = new RegExp(`${escapedLabel}:\\s*([\\s\\S]*?)(?=${lookaheadPattern})`, "i");
+  // Updated lookahead to match complete field names, not partial matches
+  const lookaheadPattern = '(Recipe |Difficulty|No\\.|Preparation\\s+Time|Cooking|Rest|Total|Cooking Temp|Calories|Best Season|Website|###|$)';
+  const re = new RegExp(`${escapedLabel}:\\s*([\\s\\S]*?)(?=\\n${lookaheadPattern})`, "i");
   const m = text.match(re);
   return m ? m[1].trim() : "";
 }
