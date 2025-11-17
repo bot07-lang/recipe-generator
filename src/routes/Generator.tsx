@@ -495,6 +495,8 @@ Calories: 320 per serving
     // Also convert standalone headings (no # at all)
     out = out.replace(/^\s*ingredients\s*:?[\t ]*$/gim, '### Ingredients');
     out = out.replace(/^\s*instructions\s*:?[\t ]*$/gim, '### Instructions');
+    out = out.replace(/^\s*equipment\s*:?[\t ]*$/gim, '### Equipment');
+    out = out.replace(/^\s*nutrition(?:\s*\(per\s+serving\))?\s*:?[\t ]*$/gim, '### Nutrition');
     return out;
   }
 
