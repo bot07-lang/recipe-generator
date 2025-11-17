@@ -51,13 +51,48 @@ function getFieldBlock(text: string, label: string): string {
     return m ? m[1].trim() : "";
   }
   
-  // For Recipe Description, handle specially to capture full multi-line content
+  // For Recipe Title, try both "Recipe Title" and "Title"
+  if (label.includes('Recipe Title')) {
+    const patterns = [
+      `Recipe\\s*Title\\s*:\\s*([^\\n]+)`,
+      `Title\\s*:\\s*([^\\n]+)`
+    ];
+    for (const pattern of patterns) {
+      const re = new RegExp(pattern, "i");
+      const m = text.match(re);
+      if (m) return m[1].trim();
+    }
+    return "";
+  }
+  
+  // For Recipe Description, try both "Recipe Description" and "Description"
   if (label.includes('Recipe Description')) {
-    const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    // Match until next field label (must be at start of line) or ### section
-    const re = new RegExp(`${escapedLabel}:\\s*([\\s\\S]*?)(?=\\n(?:Recipe |Difficulty|No\\.|Preparation\\s+Time|Cooking|Rest|Total|Cooking Temp|Calories|Best Season|Website|###)|\\n###|$)`, "i");
-    const m = text.match(re);
-    return m ? m[1].trim() : "";
+    const lookaheadPattern = '(Recipe |Difficulty|No\\.|Preparation\\s+Time|Cooking|Rest|Total|Cooking Temp|Calories|Best Season|Website|###|$)';
+    const patterns = [
+      `Recipe\\s*Description\\s*:\\s*([\\s\\S]*?)(?=\\n(?:Recipe |Difficulty|No\\.|Preparation\\s+Time|Cooking|Rest|Total|Cooking Temp|Calories|Best Season|Website|###)|\\n###|$)`,
+      `Description\\s*:\\s*([\\s\\S]*?)(?=\\n(?:Recipe |Difficulty|No\\.|Preparation\\s+Time|Cooking|Rest|Total|Cooking Temp|Calories|Best Season|Website|###)|\\n###|$)`
+    ];
+    for (const pattern of patterns) {
+      const re = new RegExp(pattern, "i");
+      const m = text.match(re);
+      if (m) return m[1].trim();
+    }
+    return "";
+  }
+  
+  // For Difficulty Level, try both "Difficulty Level" and "Level"
+  if (label.includes('Difficulty Level')) {
+    const lookaheadPattern = '(Recipe |Difficulty|No\\.|Preparation\\s+Time|Cooking|Rest|Total|Cooking Temp|Calories|Best Season|Website|###|$)';
+    const patterns = [
+      `Difficulty\\s*Level\\s*:\\s*([\\s\\S]*?)(?=\\n${lookaheadPattern})`,
+      `Level\\s*:\\s*([\\s\\S]*?)(?=\\n${lookaheadPattern})`
+    ];
+    for (const pattern of patterns) {
+      const re = new RegExp(pattern, "i");
+      const m = text.match(re);
+      if (m) return m[1].trim();
+    }
+    return "";
   }
   
   // For other fields, escape special regex chars in label
