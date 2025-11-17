@@ -37,16 +37,16 @@ const DEFAULT_TEMPLATES: Template[] = [
 function getFieldBlock(text: string, label: string): string {
   // For Total Duration, handle specially to avoid double-escaping issues
   if (label.includes('Total Duration')) {
-    // Match "Total Duration (Minutes):" followed by value on same line
-    const re = new RegExp(`Total\\s+Duration\\s+\\(Minutes\\):\\s*([^\\n]+)`, "i");
+    // Match "Total Duration (Minutes):" or "Total Duration:" followed by value on same line (spaces and Minutes optional)
+    const re = new RegExp(`Total\\s*Duration\\s*(?:\\(Minutes\\))?\\s*:\\s*([^\\n]+)`, "i");
     const m = text.match(re);
     return m ? m[1].trim() : "";
   }
   
   // For Preparation Time, handle specially to avoid lookahead issues
   if (label.includes('Preparation Time')) {
-    // Match "Preparation Time (Minutes):" followed by value on same line
-    const re = new RegExp(`Preparation\\s+Time\\s+\\(Minutes\\):\\s*([^\\n]+)`, "i");
+    // Match "Preparation Time (Minutes):" or "Preparation Time:" followed by value on same line (spaces and Minutes optional)
+    const re = new RegExp(`Preparation\\s*Time\\s*(?:\\(Minutes\\))?\\s*:\\s*([^\\n]+)`, "i");
     const m = text.match(re);
     return m ? m[1].trim() : "";
   }
