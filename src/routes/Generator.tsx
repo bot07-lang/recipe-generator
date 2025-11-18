@@ -95,6 +95,21 @@ function getFieldBlock(text: string, label: string): string {
     return "";
   }
   
+  // For No. of Servings, try both "No. of Servings" and "Servings"
+  if (label.includes('No\\. of Servings') || label.includes('Servings')) {
+    const lookaheadPattern = '(Recipe |Difficulty|No\\.|Preparation\\s+Time|Cooking|Rest|Total|Cooking Temp|Calories|Best Season|Website|###|$)';
+    const patterns = [
+      `No\\.\\s*of\\s*Servings\\s*:\\s*([\\s\\S]*?)(?=\\n${lookaheadPattern})`,
+      `Servings\\s*:\\s*([\\s\\S]*?)(?=\\n${lookaheadPattern})`
+    ];
+    for (const pattern of patterns) {
+      const re = new RegExp(pattern, "i");
+      const m = text.match(re);
+      if (m) return m[1].trim();
+    }
+    return "";
+  }
+  
   // For other fields, escape special regex chars in label
   const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   // Updated lookahead to match complete field names, not partial matches
@@ -209,7 +224,7 @@ function parseRecipeData(t: string) {
   const title       = getFieldBlock(t, "Recipe Title");
   const description = getFieldBlock(t, "Recipe Description");
   const difficulty  = getFieldBlock(t, "Difficulty Level");
-  const servings    = getFieldBlock(t, "No\\. of Servings");
+  const servings    = getFieldBlock(t, "No\\. of Servings") || getFieldBlock(t, "Servings");
   const prep        = getFieldBlock(t, "Preparation Time \\(Minutes\\)");
   const cook        = getFieldBlock(t, "Cooking Time \\(Minutes\\)");
   const rest        = getFieldBlock(t, "Rest Time \\(Minutes\\)");
