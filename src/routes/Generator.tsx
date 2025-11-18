@@ -36,11 +36,19 @@ const DEFAULT_TEMPLATES: Template[] = [
 
 function getFieldBlock(text: string, label: string): string {
   // For Total Duration, handle specially to avoid double-escaping issues
-  if (label.includes('Total Duration')) {
-    // Match "Total Duration (Minutes):" or "Total Duration:" followed by value on same line (spaces and Minutes optional)
-    const re = new RegExp(`Total\\s*Duration\\s*(?:\\(Minutes\\))?\\s*:\\s*([^\\n]+)`, "i");
-    const m = text.match(re);
-    return m ? m[1].trim() : "";
+  // Also accept "Total Time" as an alternative
+  if (label.includes('Total Duration') || label.includes('Total Time')) {
+    // Match "Total Duration (Minutes):", "Total Duration:", "Total Time (Minutes):", or "Total Time:" followed by value on same line (spaces and Minutes optional)
+    const patterns = [
+      `Total\\s*Duration\\s*(?:\\(Minutes\\))?\\s*:\\s*([^\\n]+)`,
+      `Total\\s*Time\\s*(?:\\(Minutes\\))?\\s*:\\s*([^\\n]+)`
+    ];
+    for (const pattern of patterns) {
+      const re = new RegExp(pattern, "i");
+      const m = text.match(re);
+      if (m) return m[1].trim();
+    }
+    return "";
   }
   
   // For Preparation Time, handle specially to avoid lookahead issues
@@ -228,7 +236,7 @@ function parseRecipeData(t: string) {
   const prep        = getFieldBlock(t, "Preparation Time \\(Minutes\\)");
   const cook        = getFieldBlock(t, "Cooking Time \\(Minutes\\)");
   const rest        = getFieldBlock(t, "Rest Time \\(Minutes\\)");
-  const total       = getFieldBlock(t, "Total Duration \\(Minutes\\)");
+  const total       = getFieldBlock(t, "Total Duration \\(Minutes\\)") || getFieldBlock(t, "Total Time \\(Minutes\\)") || getFieldBlock(t, "Total Time");
   const temp        = getFieldBlock(t, "Cooking Temp \\([^)]*\\)");
   let calories      = getFieldBlock(t, "Calories");
   const season      = getFieldBlock(t, "Best Season");
