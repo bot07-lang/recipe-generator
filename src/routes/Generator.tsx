@@ -802,7 +802,7 @@ Calories: 320 per serving
         if (iframe) {
           iframe.onload = () => resolve();
           iframe.srcdoc = filledHtml;
-        } else {
+          } else {
           resolve();
         }
       });
@@ -814,6 +814,30 @@ Calories: 320 per serving
       if (!iframeDoc) {
         throw new Error('Could not access iframe document');
       }
+
+      // Preload fonts by creating hidden elements with all font families
+      // This forces the browser to load fonts before html2canvas captures
+      const fontPreloader = iframeDoc.createElement('div');
+      fontPreloader.style.position = 'absolute';
+      fontPreloader.style.visibility = 'hidden';
+      fontPreloader.style.width = '1px';
+      fontPreloader.style.height = '1px';
+      fontPreloader.style.overflow = 'hidden';
+      fontPreloader.innerHTML = `
+        <span style="font-family: 'Cormorant Garamond', serif; font-weight: 400;">.</span>
+        <span style="font-family: 'Cormorant Garamond', serif; font-weight: 500;">.</span>
+        <span style="font-family: 'Cormorant Garamond', serif; font-weight: 600;">.</span>
+        <span style="font-family: 'Sweet Apricot', serif; font-weight: 300;">.</span>
+        <span style="font-family: 'Sweet Apricot', serif; font-weight: 400;">.</span>
+        <span style="font-family: 'Arimo', sans-serif; font-weight: 400;">.</span>
+        <span style="font-family: 'Arimo', sans-serif; font-weight: 500;">.</span>
+        <span style="font-family: 'Dancing Script', cursive; font-weight: 700;">.</span>
+        <span style="font-family: 'Schoolbell', cursive;">.</span>
+      `;
+      iframeDoc.body.appendChild(fontPreloader);
+      
+      // Force font loading by measuring the element
+      void fontPreloader.offsetHeight;
 
       // Wait for all images to load (including base64)
       await new Promise<void>((resolve) => {
@@ -910,30 +934,50 @@ Calories: 320 per serving
       // Also ensure fonts are fully rendered
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Double-check that fonts are loaded by checking font status
-      try {
-        if (iframeDoc.fonts && iframeDoc.fonts.check) {
-          // Wait a bit more if fonts aren't ready
-          // Check a few common font combinations
-          const fontChecks = [
-            'normal 400 16px "Cormorant Garamond"',
-            'normal 500 16px "Cormorant Garamond"',
-            'normal 400 16px "Sweet Apricot"',
-            'normal 300 16px "Sweet Apricot"',
-            'normal 400 16px "Arimo"',
-            'normal 500 16px "Arimo"'
-          ];
-          const allFontsReady = fontChecks.every(fontDesc => {
-            return iframeDoc.fonts.check(fontDesc);
-          });
-          if (!allFontsReady) {
-            await new Promise(resolve => setTimeout(resolve, 500));
+      // Aggressively wait for fonts to load
+      let fontLoadAttempts = 0;
+      const maxAttempts = 10;
+      while (fontLoadAttempts < maxAttempts) {
+        try {
+          if (iframeDoc.fonts && iframeDoc.fonts.ready) {
+            await iframeDoc.fonts.ready;
+            // Additional wait after fonts.ready
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            // Verify fonts are actually loaded
+            if (iframeDoc.fonts.check) {
+              const fontChecks = [
+                'normal 400 16px "Cormorant Garamond"',
+                'normal 500 16px "Cormorant Garamond"',
+                'normal 400 16px "Sweet Apricot"',
+                'normal 300 16px "Sweet Apricot"',
+                'normal 400 16px "Arimo"',
+                'normal 500 16px "Arimo"'
+              ];
+              const allFontsReady = fontChecks.every(fontDesc => {
+                return iframeDoc.fonts.check(fontDesc);
+              });
+              if (allFontsReady) {
+                break; // All fonts loaded, exit loop
+              }
+            } else {
+              break; // Can't check, assume loaded
+            }
+          } else {
+            break; // Font API not available
           }
+        } catch (e) {
+          console.warn('Font loading check error:', e);
         }
-      } catch (e) {
-        // Font checking not available, just wait
-        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        fontLoadAttempts++;
+        if (fontLoadAttempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
       }
+      
+      // Final wait to ensure everything is rendered
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Ensure proper z-index stacking before capture
       const allElements = iframeDoc.querySelectorAll('*');
@@ -1008,6 +1052,29 @@ Calories: 320 per serving
             void clonedPage.offsetHeight;
           }
           
+          // CRITICAL: Re-apply font preloader in clone to force font loading
+          const clonedFontPreloader = clonedDoc.createElement('div');
+          clonedFontPreloader.style.position = 'absolute';
+          clonedFontPreloader.style.visibility = 'hidden';
+          clonedFontPreloader.style.width = '1px';
+          clonedFontPreloader.style.height = '1px';
+          clonedFontPreloader.style.overflow = 'hidden';
+          clonedFontPreloader.innerHTML = `
+            <span style="font-family: 'Cormorant Garamond', serif; font-weight: 400; font-size: 55px;">.</span>
+            <span style="font-family: 'Cormorant Garamond', serif; font-weight: 500; font-size: 55px;">.</span>
+            <span style="font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 55px;">.</span>
+            <span style="font-family: 'Sweet Apricot', serif; font-weight: 300; font-size: 53px;">.</span>
+            <span style="font-family: 'Sweet Apricot', serif; font-weight: 400; font-size: 53px;">.</span>
+            <span style="font-family: 'Arimo', sans-serif; font-weight: 400;">.</span>
+            <span style="font-family: 'Arimo', sans-serif; font-weight: 500;">.</span>
+            <span style="font-family: 'Dancing Script', cursive; font-weight: 700;">.</span>
+            <span style="font-family: 'Schoolbell', cursive;">.</span>
+          `;
+          if (clonedDoc.body) {
+            clonedDoc.body.appendChild(clonedFontPreloader);
+            void clonedFontPreloader.offsetHeight;
+          }
+          
           // Ensure all headings and text elements are visible and properly styled with fonts
           // Prioritize headings first as they're most critical
           const headings = clonedDoc.querySelectorAll('h1, h2, h3, h4, h5, h6, .section-title, .directions-title, .notes-title, .ingredients-container h2, .title-section h1, .title-main');
@@ -1020,10 +1087,14 @@ Calories: 320 per serving
             // Access computed style to get actual font properties
             const computedStyle = clonedDoc.defaultView?.getComputedStyle(htmlEl);
             if (computedStyle) {
+              // Get the actual computed font size to prevent shrinking
+              const fontSize = computedStyle.fontSize;
+              const fontFamily = computedStyle.fontFamily;
+              
               // Preserve all font-related properties with explicit values
               // Use setProperty with important flag to override any conflicting styles
-              htmlEl.style.setProperty('font-family', computedStyle.fontFamily, 'important');
-              htmlEl.style.setProperty('font-size', computedStyle.fontSize, 'important');
+              htmlEl.style.setProperty('font-family', fontFamily, 'important');
+              htmlEl.style.setProperty('font-size', fontSize, 'important');
               htmlEl.style.setProperty('font-weight', computedStyle.fontWeight, 'important');
               htmlEl.style.setProperty('font-style', computedStyle.fontStyle, 'important');
               htmlEl.style.setProperty('letter-spacing', computedStyle.letterSpacing, 'important');
@@ -1033,6 +1104,17 @@ Calories: 320 per serving
               // Ensure no transform is shrinking the text
               htmlEl.style.setProperty('transform', 'none', 'important');
               htmlEl.style.setProperty('scale', '1', 'important');
+              htmlEl.style.setProperty('zoom', '1', 'important');
+              
+              // Force the browser to use the correct font by creating a test element
+              const testSpan = clonedDoc.createElement('span');
+              testSpan.style.fontFamily = fontFamily;
+              testSpan.style.fontSize = fontSize;
+              testSpan.style.position = 'absolute';
+              testSpan.style.visibility = 'hidden';
+              testSpan.textContent = 'M';
+              clonedDoc.body.appendChild(testSpan);
+              void testSpan.offsetWidth;
             }
             // Force reflow multiple times to ensure font is loaded and rendered
             void htmlEl.offsetHeight;
@@ -1092,8 +1174,16 @@ Calories: 320 per serving
         }
       });
 
-      // Clean up iframe
+      // Clean up iframe and font preloader
       if (iframe && iframe.parentNode) {
+        // Remove font preloader from iframe before removing iframe
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (iframeDoc) {
+          const preloader = iframeDoc.querySelector('div[style*="visibility: hidden"]');
+          if (preloader && preloader.parentNode) {
+            preloader.parentNode.removeChild(preloader);
+          }
+        }
         document.body.removeChild(iframe);
       }
 
