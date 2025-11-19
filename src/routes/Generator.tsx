@@ -824,18 +824,35 @@ Calories: 320 per serving
         let stylesheetsLoaded = 0;
         const totalResources = images.length + stylesheets.length;
 
-        if (totalResources === 0) {
-          // Wait for fonts to load
-          setTimeout(() => resolve(), 1000);
-          return;
-        }
-
-        const checkComplete = () => {
+        const checkComplete = async () => {
           if (imagesLoaded + stylesheetsLoaded >= totalResources) {
+            // Wait for fonts to be fully loaded using Font Loading API
+            try {
+              if (iframeDoc.fonts && iframeDoc.fonts.ready) {
+                await iframeDoc.fonts.ready;
+              }
+            } catch (e) {
+              console.warn('Font loading API not available:', e);
+            }
             // Extra wait for fonts and CSS pseudo-elements to render
-            setTimeout(() => resolve(), 500);
+            setTimeout(() => resolve(), 1000);
           }
         };
+
+        if (totalResources === 0) {
+          // No images or stylesheets, but still wait for fonts
+          (async () => {
+            try {
+              if (iframeDoc.fonts && iframeDoc.fonts.ready) {
+                await iframeDoc.fonts.ready;
+              }
+            } catch (e) {
+              console.warn('Font loading API not available:', e);
+            }
+            setTimeout(() => resolve(), 1500);
+          })();
+          return;
+        }
 
         // Wait for images
         images.forEach((imgEl) => {
@@ -874,7 +891,7 @@ Calories: 320 per serving
         // Fallback timeout
         setTimeout(() => {
           resolve();
-        }, 5000);
+        }, 8000);
       });
 
       // Find the main container element (try multiple selectors)
@@ -935,6 +952,25 @@ Calories: 320 per serving
             }
           }
           
+          // Ensure container elements have visible overflow to prevent clipping headings
+          const containers = clonedDoc.querySelectorAll('.page, .recipe-grid, .container, .recipe-card, .card');
+          containers.forEach((container) => {
+            const htmlEl = container as HTMLElement;
+            const computedStyle = clonedDoc.defaultView?.getComputedStyle(htmlEl);
+            if (computedStyle && computedStyle.overflow === 'hidden') {
+              // Change overflow to visible to prevent clipping headings
+              htmlEl.style.overflow = 'visible';
+            }
+            // Also ensure parent sections don't clip
+            const parent = htmlEl.parentElement;
+            if (parent) {
+              const parentStyle = clonedDoc.defaultView?.getComputedStyle(parent);
+              if (parentStyle && parentStyle.overflow === 'hidden') {
+                (parent as HTMLElement).style.overflow = 'visible';
+              }
+            }
+          });
+          
           // Ensure the page element has proper background
           const clonedPage = clonedDoc.querySelector('.page') as HTMLElement;
           if (clonedPage) {
@@ -945,6 +981,30 @@ Calories: 320 per serving
             // Force reflow to ensure background is applied
             void clonedPage.offsetHeight;
           }
+          
+          // Ensure all headings and text elements are visible and properly styled with fonts
+          const textElements = clonedDoc.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span, li, div, .section-title, .directions-title, .notes-title, .ingredients-container h2, .title-section h1, .info-list li');
+          textElements.forEach((element) => {
+            const htmlEl = element as HTMLElement;
+            // Ensure visibility
+            htmlEl.style.visibility = 'visible';
+            htmlEl.style.display = '';
+            htmlEl.style.opacity = '1';
+            // Access computed style to get actual font properties
+            const computedStyle = clonedDoc.defaultView?.getComputedStyle(htmlEl);
+            if (computedStyle) {
+              // Preserve all font-related properties to ensure fonts render correctly
+              htmlEl.style.fontFamily = computedStyle.fontFamily;
+              htmlEl.style.fontSize = computedStyle.fontSize;
+              htmlEl.style.fontWeight = computedStyle.fontWeight;
+              htmlEl.style.fontStyle = computedStyle.fontStyle;
+              htmlEl.style.letterSpacing = computedStyle.letterSpacing;
+              htmlEl.style.color = computedStyle.color;
+              htmlEl.style.lineHeight = computedStyle.lineHeight;
+            }
+            // Force reflow to ensure font is loaded and rendered
+            void htmlEl.offsetHeight;
+          });
           
           // Force pseudo-elements to render by ensuring parent has proper styles
           // Note: html2canvas has limited support for ::before and ::after with background images
