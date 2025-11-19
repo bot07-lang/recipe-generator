@@ -901,9 +901,13 @@ Calories: 320 per serving
         }
       });
 
+      // Get the actual background color from the page element
+      const pageStyle = iframeDoc.defaultView?.getComputedStyle(cardElement as HTMLElement);
+      const pageBgColor = pageStyle?.backgroundColor || '#ffffff';
+      
       // Generate PNG using html2canvas
       const canvas = await html2canvas(cardElement as HTMLElement, {
-        backgroundColor: '#ffffff',
+        backgroundColor: pageBgColor !== 'rgba(0, 0, 0, 0)' && pageBgColor !== 'transparent' ? pageBgColor : '#ffffff',
         scale: 2,
         useCORS: true,
         allowTaint: true,
@@ -917,15 +921,47 @@ Calories: 320 per serving
           // Don't ignore any elements - we want everything
           return false;
         },
-        onclone: (clonedDoc) => {
+        onclone: (clonedDoc, element) => {
           // Ensure all styles are preserved in the clone
           const clonedBody = clonedDoc.body;
           if (clonedBody) {
             clonedBody.style.visibility = 'visible';
+            // Ensure body background is visible
+            const bodyStyle = clonedDoc.defaultView?.getComputedStyle(clonedBody);
+            if (bodyStyle && bodyStyle.backgroundColor && bodyStyle.backgroundColor !== 'rgba(0, 0, 0, 0)') {
+              clonedBody.style.backgroundColor = bodyStyle.backgroundColor;
+            }
           }
+          
+          // Ensure the page element has proper background
+          const clonedPage = clonedDoc.querySelector('.page') as HTMLElement;
+          if (clonedPage) {
+            const clonedPageStyle = clonedDoc.defaultView?.getComputedStyle(clonedPage);
+            if (clonedPageStyle && clonedPageStyle.backgroundColor && clonedPageStyle.backgroundColor !== 'rgba(0, 0, 0, 0)') {
+              clonedPage.style.backgroundColor = clonedPageStyle.backgroundColor;
+            }
+            // Force reflow to ensure background is applied
+            void clonedPage.offsetHeight;
+          }
+          
+          // Force pseudo-elements to render by ensuring parent has proper styles
+          // Note: html2canvas has limited support for ::before and ::after with background images
+          // But we can try to force them by ensuring the parent element is properly styled
+          const pageElement = clonedDoc.querySelector('.page');
+          if (pageElement) {
+            const htmlEl = pageElement as HTMLElement;
+            // Force reflow to ensure pseudo-elements are rendered
+            void htmlEl.offsetHeight;
+            // Access computed styles to trigger rendering
+            const beforeStyle = clonedDoc.defaultView?.getComputedStyle(htmlEl, '::before');
+            const afterStyle = clonedDoc.defaultView?.getComputedStyle(htmlEl, '::after');
+            // Force another reflow
+            void htmlEl.offsetHeight;
+          }
+          
           // Force z-index recalculation in clone
-          const clonedElements = clonedDoc.querySelectorAll('*');
-          clonedElements.forEach((el) => {
+          const allElements = clonedDoc.querySelectorAll('*');
+          allElements.forEach((el) => {
             const htmlEl = el as HTMLElement;
             const computedStyle = clonedDoc.defaultView?.getComputedStyle(htmlEl);
             if (computedStyle && computedStyle.position !== 'static') {
