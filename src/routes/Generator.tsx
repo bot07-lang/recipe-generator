@@ -378,6 +378,7 @@ Calories: 320 per serving
   const [generatedHtml, setGeneratedHtml] = useState('');
   const [pngUrl, setPngUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingTemplateHtml, setEditingTemplateHtml] = useState('');
@@ -481,13 +482,25 @@ Calories: 320 per serving
   }
 
   useEffect(() => {
-    loadTemplates();
+    let mounted = true;
+    
+    async function init() {
+      try {
+        await loadTemplates();
+      } catch (error) {
+        if (mounted) {
+          console.error('Failed to initialize templates:', error);
+        }
+      }
+    }
+    
+    init();
     
     // Reload templates when page becomes visible after being hidden
     // (helps when new templates are added in Developer page)
     let wasHidden = document.hidden;
     const handleVisibilityChange = () => {
-      if (wasHidden && !document.hidden) {
+      if (wasHidden && !document.hidden && mounted) {
         // Page was hidden and now visible - reload templates
         loadTemplates();
       }
@@ -496,20 +509,34 @@ Calories: 320 per serving
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
     return () => {
+      mounted = false;
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
   async function loadTemplates() {
+    setIsLoadingTemplates(true);
     try {
+      // Add timeout to prevent infinite loading (10 seconds)
+      const timeoutId = setTimeout(() => {
+        console.warn('Template loading taking too long, using defaults');
+        setTemplates(DEFAULT_TEMPLATES);
+        setIsLoadingTemplates(false);
+        setNotification({ message: 'Loading timeout. Using default templates.', type: 'info' });
+      }, 10000);
+
       const { data, error } = await supabase
         .from('templates')
         .select('*')
         .order('created_at', { ascending: false });
 
+      clearTimeout(timeoutId);
+
       if (error) {
         console.error('Error loading templates:', error);
         setTemplates(DEFAULT_TEMPLATES);
+        setIsLoadingTemplates(false);
+        setNotification({ message: 'Failed to load templates. Using defaults.', type: 'error' });
         return;
       }
 
@@ -520,9 +547,12 @@ Calories: 320 per serving
         setTemplates(DEFAULT_TEMPLATES);
         await insertDefaultTemplates();
       }
+      setIsLoadingTemplates(false);
     } catch (error) {
       console.error('Error loading templates:', error);
       setTemplates(DEFAULT_TEMPLATES);
+      setIsLoadingTemplates(false);
+      setNotification({ message: 'Connection error. Using default templates.', type: 'error' });
     }
   }
 
@@ -754,61 +784,139 @@ Calories: 320 per serving
     if (!filledHtml) return;
     
     setIsGenerating(true);
+    let iframe: HTMLIFrameElement | null = null;
+    
     try {
-      // Create a temporary container for the HTML
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = filledHtml;
-      tempDiv.style.position = 'absolute';
-      tempDiv.style.left = '-9999px';
-      tempDiv.style.top = '-9999px';
-      // Let the template define its own sizing to avoid distortion
-      tempDiv.style.display = 'inline-block';
-      document.body.appendChild(tempDiv);
+      // Create an iframe for better isolation and proper rendering of external resources
+      iframe = document.createElement('iframe');
+      iframe.style.position = 'absolute';
+      iframe.style.left = '-9999px';
+      iframe.style.top = '0';
+      iframe.style.width = '2100px'; // A4 width at 2x scale
+      iframe.style.height = '2970px'; // A4 height at 2x scale
+      iframe.style.border = 'none';
+      document.body.appendChild(iframe);
 
-      // Wait for content to render and all images to load
-      await new Promise(resolve => setTimeout(resolve, 50));
-      await new Promise(resolve => {
-        const images = Array.from(tempDiv.querySelectorAll('img')) as HTMLImageElement[];
-        if (images.length === 0) return resolve(undefined);
-        let remaining = images.length;
-        images.forEach(imgEl => {
-          if (imgEl.complete) {
-            remaining -= 1;
-            if (remaining === 0) resolve(undefined);
-          } else {
-            const done = () => { remaining -= 1; if (remaining === 0) resolve(undefined); };
-            imgEl.onload = done;
-            imgEl.onerror = done;
-          }
-        });
+      // Wait for iframe to be ready
+      await new Promise<void>((resolve) => {
+        if (iframe) {
+          iframe.onload = () => resolve();
+          iframe.srcdoc = filledHtml;
+        } else {
+          resolve();
+        }
       });
-      
-      // Get the actual card element (without body padding)
-      // Many templates use `.recipe-card`; fall back to `.card` or the container
-      const cardElement = (tempDiv.querySelector('.recipe-card') || tempDiv.querySelector('.card') || tempDiv) as HTMLElement;
-      
-      // Optionally constrain export width to a Canva-like size (keeps aspect ratio)
-      const exportWidth = 1080; // change if you want 1200/1920/etc.
-      const prevWidth = (cardElement as HTMLElement).style.width;
-      if (exportWidth) {
-        (cardElement as HTMLElement).style.width = `${exportWidth}px`;
+
+      // Wait a bit for initial render
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (!iframeDoc) {
+        throw new Error('Could not access iframe document');
       }
 
-      // Generate PNG using html2canvas on the card element directly
-      const canvas = await html2canvas(cardElement, {
-        backgroundColor: '#ffffff',
-        scale: 2, // increase scale for sharper output at fixed width
-        useCORS: true,
-        allowTaint: true
+      // Wait for all images to load (including base64)
+      await new Promise<void>((resolve) => {
+        const images = Array.from(iframeDoc.querySelectorAll('img')) as HTMLImageElement[];
+        const stylesheets = Array.from(iframeDoc.querySelectorAll('link[rel="stylesheet"]')) as HTMLLinkElement[];
+        
+        let imagesLoaded = 0;
+        let stylesheetsLoaded = 0;
+        const totalResources = images.length + stylesheets.length;
+
+        if (totalResources === 0) {
+          // Wait for fonts to load
+          setTimeout(() => resolve(), 1000);
+          return;
+        }
+
+        const checkComplete = () => {
+          if (imagesLoaded + stylesheetsLoaded >= totalResources) {
+            // Extra wait for fonts and CSS pseudo-elements to render
+            setTimeout(() => resolve(), 500);
+          }
+        };
+
+        // Wait for images
+        images.forEach((imgEl) => {
+          if (imgEl.complete && imgEl.naturalWidth > 0) {
+            imagesLoaded++;
+            checkComplete();
+          } else {
+            imgEl.onload = () => {
+              imagesLoaded++;
+              checkComplete();
+            };
+            imgEl.onerror = () => {
+              imagesLoaded++;
+              checkComplete();
+            };
+          }
+        });
+
+        // Wait for stylesheets (fonts)
+        stylesheets.forEach((link) => {
+          if (link.sheet) {
+            stylesheetsLoaded++;
+            checkComplete();
+          } else {
+            link.onload = () => {
+              stylesheetsLoaded++;
+              checkComplete();
+            };
+            link.onerror = () => {
+              stylesheetsLoaded++;
+              checkComplete();
+            };
+          }
+        });
+
+        // Fallback timeout
+        setTimeout(() => {
+          resolve();
+        }, 5000);
       });
 
-      // Restore original width after capture
-      (cardElement as HTMLElement).style.width = prevWidth;
+      // Find the main container element (try multiple selectors)
+      const cardElement = iframeDoc.querySelector('.page') || 
+                         iframeDoc.querySelector('.recipe-card') || 
+                         iframeDoc.querySelector('.card') || 
+                         iframeDoc.body;
 
-      // Clean up
-      document.body.removeChild(tempDiv);
+      if (!cardElement) {
+        throw new Error('Could not find container element');
+      }
 
-      // Convert to JPEG blob with compression for smaller file size
+      // Wait a bit more for CSS pseudo-elements (::before, ::after) to render
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // Generate PNG using html2canvas
+      const canvas = await html2canvas(cardElement as HTMLElement, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        windowWidth: iframeDoc.documentElement.scrollWidth,
+        windowHeight: iframeDoc.documentElement.scrollHeight,
+        // Important: enable these for better rendering
+        removeContainer: false,
+        imageTimeout: 15000,
+        onclone: (clonedDoc) => {
+          // Ensure all styles are preserved in the clone
+          const clonedBody = clonedDoc.body;
+          if (clonedBody) {
+            clonedBody.style.visibility = 'visible';
+          }
+        }
+      });
+
+      // Clean up iframe
+      if (iframe && iframe.parentNode) {
+        document.body.removeChild(iframe);
+      }
+
+      // Convert to JPEG blob with compression
       const blob = await new Promise<Blob>((resolve, reject) => {
         canvas.toBlob((blob) => {
           if (blob) {
@@ -816,10 +924,10 @@ Calories: 320 per serving
           } else {
             reject(new Error('Failed to create blob'));
           }
-        }, 'image/jpeg', 0.85); // JPEG with 85% quality for smaller file size
+        }, 'image/jpeg', 0.92); // Higher quality for better output
       });
-      const url = URL.createObjectURL(blob);
       
+      const url = URL.createObjectURL(blob);
       setPngUrl(url);
       
       // Auto-download
@@ -831,7 +939,12 @@ Calories: 320 per serving
       setNotification({ message: 'Recipe card image generated and downloaded!', type: 'success' });
     } catch (err) {
       console.error('Failed to generate image:', err);
-      setNotification({ message: 'Failed to generate image. Please try again.', type: 'error' });
+      setNotification({ message: `Failed to generate image: ${err instanceof Error ? err.message : 'Unknown error'}. Please try again.`, type: 'error' });
+      
+      // Clean up iframe on error
+      if (iframe && iframe.parentNode) {
+        document.body.removeChild(iframe);
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -841,6 +954,16 @@ Calories: 320 per serving
     <div className="generator-shell">
       <div className="page-title">Generator</div>
       {/* Template gallery (uses Figma-like preview images; mapped by template id) */}
+      {isLoadingTemplates && (
+        <div style={{
+          padding: '40px',
+          textAlign: 'center',
+          color: '#666',
+          fontSize: '16px'
+        }}>
+          Loading templates...
+        </div>
+      )}
       <div className="gallery">
         {templates.map(t => (
           <div key={t.id} className={`gallery-card ${(templateId === t.id || templateName === t.name) ? 'selected' : ''}`} style={{position:'relative'}}>
