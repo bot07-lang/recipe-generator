@@ -881,6 +881,8 @@ Calories: 320 per serving
       const cardElement = iframeDoc.querySelector('.page') || 
                          iframeDoc.querySelector('.recipe-card') || 
                          iframeDoc.querySelector('.card') || 
+                         iframeDoc.querySelector('.container') ||
+                         iframeDoc.querySelector('.recipe-grid') ||
                          iframeDoc.body;
 
       if (!cardElement) {
