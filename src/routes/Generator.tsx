@@ -815,29 +815,60 @@ Calories: 320 per serving
         throw new Error('Could not access iframe document');
       }
 
-      // Preload fonts by creating hidden elements with all font families
+      // Dynamically detect and preload fonts actually used in the document
       // This forces the browser to load fonts before html2canvas captures
-      const fontPreloader = iframeDoc.createElement('div');
-      fontPreloader.style.position = 'absolute';
-      fontPreloader.style.visibility = 'hidden';
-      fontPreloader.style.width = '1px';
-      fontPreloader.style.height = '1px';
-      fontPreloader.style.overflow = 'hidden';
-      fontPreloader.innerHTML = `
-        <span style="font-family: 'Cormorant Garamond', serif; font-weight: 400;">.</span>
-        <span style="font-family: 'Cormorant Garamond', serif; font-weight: 500;">.</span>
-        <span style="font-family: 'Cormorant Garamond', serif; font-weight: 600;">.</span>
-        <span style="font-family: 'Sweet Apricot', serif; font-weight: 300;">.</span>
-        <span style="font-family: 'Sweet Apricot', serif; font-weight: 400;">.</span>
-        <span style="font-family: 'Arimo', sans-serif; font-weight: 400;">.</span>
-        <span style="font-family: 'Arimo', sans-serif; font-weight: 500;">.</span>
-        <span style="font-family: 'Dancing Script', cursive; font-weight: 700;">.</span>
-        <span style="font-family: 'Schoolbell', cursive;">.</span>
-      `;
-      iframeDoc.body.appendChild(fontPreloader);
+      const docElements = iframeDoc.querySelectorAll('*');
+      const fontFamilies = new Set<string>();
+      const fontWeights = new Set<string>();
       
-      // Force font loading by measuring the element
-      void fontPreloader.offsetHeight;
+      docElements.forEach((el) => {
+        const computedStyle = iframeDoc.defaultView?.getComputedStyle(el as HTMLElement);
+        if (computedStyle) {
+          const fontFamily = computedStyle.fontFamily;
+          const fontWeight = computedStyle.fontWeight;
+          // Extract font family name (remove quotes and fallbacks)
+          // Match quoted fonts first, then unquoted fonts before comma
+          const fontMatch = fontFamily.match(/['"]([^'"]+)['"]|([^,]+)/);
+          if (fontMatch) {
+            let fontName = (fontMatch[1] || fontMatch[2] || '').trim();
+            // Only exclude generic font families, keep custom fonts even if they're serif/sans-serif/cursive
+            if (fontName && 
+                fontName !== 'serif' && 
+                fontName !== 'sans-serif' && 
+                fontName !== 'cursive' &&
+                fontName !== 'monospace' &&
+                fontName !== 'fantasy' &&
+                !fontName.startsWith('ui-')) {
+              fontFamilies.add(fontName);
+            }
+          }
+          if (fontWeight) {
+            fontWeights.add(fontWeight);
+          }
+        }
+      });
+      
+      // Create font preloader with detected fonts
+      if (fontFamilies.size > 0) {
+        const fontPreloader = iframeDoc.createElement('div');
+        fontPreloader.style.position = 'absolute';
+        fontPreloader.style.visibility = 'hidden';
+        fontPreloader.style.width = '1px';
+        fontPreloader.style.height = '1px';
+        fontPreloader.style.overflow = 'hidden';
+        
+        const preloaderHTML = Array.from(fontFamilies).map(font => {
+          return Array.from(fontWeights).map(weight => {
+            return `<span style="font-family: '${font}'; font-weight: ${weight}; font-size: 50px;">.</span>`;
+          }).join('');
+        }).join('');
+        
+        fontPreloader.innerHTML = preloaderHTML;
+        iframeDoc.body.appendChild(fontPreloader);
+        
+        // Force font loading by measuring the element
+        void fontPreloader.offsetHeight;
+      }
 
       // Wait for all images to load (including base64)
       await new Promise<void>((resolve) => {
@@ -944,24 +975,31 @@ Calories: 320 per serving
             // Additional wait after fonts.ready
             await new Promise(resolve => setTimeout(resolve, 300));
             
-            // Verify fonts are actually loaded
-            if (iframeDoc.fonts.check) {
-              const fontChecks = [
-                'normal 400 16px "Cormorant Garamond"',
-                'normal 500 16px "Cormorant Garamond"',
-                'normal 400 16px "Sweet Apricot"',
-                'normal 300 16px "Sweet Apricot"',
-                'normal 400 16px "Arimo"',
-                'normal 500 16px "Arimo"'
-              ];
-              const allFontsReady = fontChecks.every(fontDesc => {
-                return iframeDoc.fonts.check(fontDesc);
-              });
+            // Verify fonts are actually loaded (check all fonts in document)
+            if (iframeDoc.fonts.check && iframeDoc.fonts.size > 0) {
+              // Check if all fonts in the document are loaded
+              let allFontsReady = true;
+              try {
+                for (const font of iframeDoc.fonts) {
+                  // Use a standard size for checking
+                  const fontDesc = `${font.style} ${font.weight} 16px "${font.family}"`;
+                  if (!iframeDoc.fonts.check(fontDesc)) {
+                    allFontsReady = false;
+                    break;
+                  }
+                }
+              } catch (e) {
+                // If we can't check, assume ready after waiting
+                allFontsReady = fontLoadAttempts >= 3;
+              }
               if (allFontsReady) {
                 break; // All fonts loaded, exit loop
               }
             } else {
-              break; // Can't check, assume loaded
+              // No fonts to check or API not available, wait a bit then proceed
+              if (fontLoadAttempts >= 2) {
+                break;
+              }
             }
           } else {
             break; // Font API not available
@@ -1052,25 +1090,55 @@ Calories: 320 per serving
             void clonedPage.offsetHeight;
           }
           
-          // CRITICAL: Re-apply font preloader in clone to force font loading
-          const clonedFontPreloader = clonedDoc.createElement('div');
-          clonedFontPreloader.style.position = 'absolute';
-          clonedFontPreloader.style.visibility = 'hidden';
-          clonedFontPreloader.style.width = '1px';
-          clonedFontPreloader.style.height = '1px';
-          clonedFontPreloader.style.overflow = 'hidden';
-          clonedFontPreloader.innerHTML = `
-            <span style="font-family: 'Cormorant Garamond', serif; font-weight: 400; font-size: 55px;">.</span>
-            <span style="font-family: 'Cormorant Garamond', serif; font-weight: 500; font-size: 55px;">.</span>
-            <span style="font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 55px;">.</span>
-            <span style="font-family: 'Sweet Apricot', serif; font-weight: 300; font-size: 53px;">.</span>
-            <span style="font-family: 'Sweet Apricot', serif; font-weight: 400; font-size: 53px;">.</span>
-            <span style="font-family: 'Arimo', sans-serif; font-weight: 400;">.</span>
-            <span style="font-family: 'Arimo', sans-serif; font-weight: 500;">.</span>
-            <span style="font-family: 'Dancing Script', cursive; font-weight: 700;">.</span>
-            <span style="font-family: 'Schoolbell', cursive;">.</span>
-          `;
-          if (clonedDoc.body) {
+          // CRITICAL: Re-apply font preloader in clone using fonts from the cloned document
+          // Dynamically detect fonts used in the cloned document
+          const clonedDocElements = clonedDoc.querySelectorAll('*');
+          const clonedFontFamilies = new Set<string>();
+          const clonedFontWeights = new Set<string>();
+          
+          clonedDocElements.forEach((el) => {
+            const computedStyle = clonedDoc.defaultView?.getComputedStyle(el as HTMLElement);
+            if (computedStyle) {
+              const fontFamily = computedStyle.fontFamily;
+              const fontWeight = computedStyle.fontWeight;
+              // Extract font family name (remove quotes and fallbacks)
+              // Match quoted fonts first, then unquoted fonts before comma
+              const fontMatch = fontFamily.match(/['"]([^'"]+)['"]|([^,]+)/);
+              if (fontMatch) {
+                let fontName = (fontMatch[1] || fontMatch[2] || '').trim();
+                // Only exclude generic font families, keep custom fonts even if they're serif/sans-serif/cursive
+                if (fontName && 
+                    fontName !== 'serif' && 
+                    fontName !== 'sans-serif' && 
+                    fontName !== 'cursive' &&
+                    fontName !== 'monospace' &&
+                    fontName !== 'fantasy' &&
+                    !fontName.startsWith('ui-')) {
+                  clonedFontFamilies.add(fontName);
+                }
+              }
+              if (fontWeight) {
+                clonedFontWeights.add(fontWeight);
+              }
+            }
+          });
+          
+          // Create font preloader with detected fonts
+          if (clonedFontFamilies.size > 0 && clonedDoc.body) {
+            const clonedFontPreloader = clonedDoc.createElement('div');
+            clonedFontPreloader.style.position = 'absolute';
+            clonedFontPreloader.style.visibility = 'hidden';
+            clonedFontPreloader.style.width = '1px';
+            clonedFontPreloader.style.height = '1px';
+            clonedFontPreloader.style.overflow = 'hidden';
+            
+            const preloaderHTML = Array.from(clonedFontFamilies).map(font => {
+              return Array.from(clonedFontWeights).map(weight => {
+                return `<span style="font-family: '${font}'; font-weight: ${weight}; font-size: 50px;">.</span>`;
+              }).join('');
+            }).join('');
+            
+            clonedFontPreloader.innerHTML = preloaderHTML;
             clonedDoc.body.appendChild(clonedFontPreloader);
             void clonedFontPreloader.offsetHeight;
           }
