@@ -890,6 +890,17 @@ Calories: 320 per serving
       // Wait a bit more for CSS pseudo-elements (::before, ::after) to render
       await new Promise(resolve => setTimeout(resolve, 300));
 
+      // Ensure proper z-index stacking before capture
+      const allElements = iframeDoc.querySelectorAll('*');
+      allElements.forEach((el) => {
+        const htmlEl = el as HTMLElement;
+        const computedStyle = iframeDoc.defaultView?.getComputedStyle(htmlEl);
+        if (computedStyle) {
+          // Force reflow to ensure z-index is applied
+          void htmlEl.offsetHeight;
+        }
+      });
+
       // Generate PNG using html2canvas
       const canvas = await html2canvas(cardElement as HTMLElement, {
         backgroundColor: '#ffffff',
@@ -902,12 +913,26 @@ Calories: 320 per serving
         // Important: enable these for better rendering
         removeContainer: false,
         imageTimeout: 15000,
+        ignoreElements: (element) => {
+          // Don't ignore any elements - we want everything
+          return false;
+        },
         onclone: (clonedDoc) => {
           // Ensure all styles are preserved in the clone
           const clonedBody = clonedDoc.body;
           if (clonedBody) {
             clonedBody.style.visibility = 'visible';
           }
+          // Force z-index recalculation in clone
+          const clonedElements = clonedDoc.querySelectorAll('*');
+          clonedElements.forEach((el) => {
+            const htmlEl = el as HTMLElement;
+            const computedStyle = clonedDoc.defaultView?.getComputedStyle(htmlEl);
+            if (computedStyle && computedStyle.position !== 'static') {
+              // Ensure z-index is preserved
+              void htmlEl.offsetHeight;
+            }
+          });
         }
       });
 
