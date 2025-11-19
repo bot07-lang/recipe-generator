@@ -792,11 +792,9 @@ Calories: 320 per serving
       iframe.style.position = 'absolute';
       iframe.style.left = '-9999px';
       iframe.style.top = '0';
-      // Use larger dimensions to accommodate any template size
-      iframe.style.width = '2000px';
-      iframe.style.height = '3000px';
+      iframe.style.width = '2100px'; // A4 width at 2x scale
+      iframe.style.height = '2970px'; // A4 height at 2x scale
       iframe.style.border = 'none';
-      iframe.style.overflow = 'visible';
       document.body.appendChild(iframe);
 
       // Wait for iframe to be ready
@@ -810,23 +808,11 @@ Calories: 320 per serving
       });
 
       // Wait a bit for initial render
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 200));
 
       const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
       if (!iframeDoc) {
         throw new Error('Could not access iframe document');
-      }
-      
-      // Ensure iframe body is properly set up
-      if (iframeDoc.body) {
-        iframeDoc.body.style.margin = '0';
-        iframeDoc.body.style.padding = '0';
-        iframeDoc.body.style.overflow = 'visible';
-      }
-      
-      // Ensure html element is properly set up
-      if (iframeDoc.documentElement) {
-        iframeDoc.documentElement.style.overflow = 'visible';
       }
 
       // Dynamically detect and preload fonts actually used in the document
@@ -975,9 +961,6 @@ Calories: 320 per serving
         throw new Error('Could not find container element');
       }
 
-      // Force a reflow to ensure all elements are rendered
-      void iframeDoc.documentElement.offsetHeight;
-      
       // Wait a bit more for CSS pseudo-elements (::before, ::after) to render
       // Also ensure fonts are fully rendered
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -1045,56 +1028,29 @@ Calories: 320 per serving
         }
       });
 
-      // Ensure the card element is visible and has proper dimensions
-      const cardEl = cardElement as HTMLElement;
-      cardEl.style.visibility = 'visible';
-      cardEl.style.display = '';
-      cardEl.style.opacity = '1';
-      
-      // Force a reflow to ensure dimensions are calculated
-      void cardEl.offsetHeight;
-      void cardEl.scrollHeight;
-      
       // Get the actual background color from the page element
-      const pageStyle = iframeDoc.defaultView?.getComputedStyle(cardEl);
+      const pageStyle = iframeDoc.defaultView?.getComputedStyle(cardElement as HTMLElement);
       const pageBgColor = pageStyle?.backgroundColor || '#ffffff';
       
-      // Get actual dimensions - use scroll dimensions to capture full content
-      const actualWidth = Math.max(
-        cardEl.scrollWidth || 0,
-        cardEl.offsetWidth || 0,
-        iframeDoc.documentElement.scrollWidth || 0,
-        1000 // Minimum width
-      );
-      const actualHeight = Math.max(
-        cardEl.scrollHeight || 0,
-        cardEl.offsetHeight || 0,
-        iframeDoc.documentElement.scrollHeight || 0,
-        1200 // Minimum height
-      );
-      
       // Generate PNG using html2canvas
-      const canvas = await html2canvas(cardEl, {
+      const canvas = await html2canvas(cardElement as HTMLElement, {
         backgroundColor: pageBgColor !== 'rgba(0, 0, 0, 0)' && pageBgColor !== 'transparent' ? pageBgColor : '#ffffff',
         scale: 2,
         useCORS: true,
         allowTaint: true,
-        logging: false, // Disable logging for production
-        // Use scroll dimensions to ensure full content is captured
-        windowWidth: actualWidth,
-        windowHeight: actualHeight,
+        logging: false,
+        windowWidth: iframeDoc.documentElement.scrollWidth,
+        windowHeight: iframeDoc.documentElement.scrollHeight,
         // Important: enable these for better rendering
         removeContainer: false,
         imageTimeout: 15000,
-        foreignObjectRendering: true, // Better CSS support
         ignoreElements: (element) => {
           // Don't ignore any elements - we want everything
           return false;
         },
         onclone: (clonedDoc, element) => {
-          // Ensure body and html are visible
+          // Ensure all styles are preserved in the clone
           const clonedBody = clonedDoc.body;
-          const clonedHtml = clonedDoc.documentElement;
           if (clonedBody) {
             clonedBody.style.visibility = 'visible';
             // Ensure body background is visible
@@ -1103,25 +1059,6 @@ Calories: 320 per serving
               clonedBody.style.backgroundColor = bodyStyle.backgroundColor;
             }
           }
-          if (clonedHtml) {
-            clonedHtml.style.visibility = 'visible';
-          }
-          
-          // Only fix elements that are explicitly hidden, don't mess with layout
-          // Check for elements that might be hidden by CSS rules
-          const potentiallyHidden = clonedDoc.querySelectorAll('[style*="display: none"], [style*="visibility: hidden"]');
-          potentiallyHidden.forEach((el) => {
-            const htmlEl = el as HTMLElement;
-            // Only fix if it's not a script/style tag and has content
-            if (htmlEl.tagName !== 'SCRIPT' && htmlEl.tagName !== 'STYLE' && htmlEl.textContent?.trim()) {
-              if (htmlEl.style.display === 'none') {
-                htmlEl.style.display = '';
-              }
-              if (htmlEl.style.visibility === 'hidden') {
-                htmlEl.style.visibility = 'visible';
-              }
-            }
-          });
           
           // Ensure container elements have visible overflow to prevent clipping headings
           const containers = clonedDoc.querySelectorAll('.page, .recipe-grid, .container, .recipe-card, .card');
@@ -1140,28 +1077,6 @@ Calories: 320 per serving
                 (parent as HTMLElement).style.overflow = 'visible';
               }
             }
-          });
-          
-          // Ensure images are visible and loaded
-          const allImages = clonedDoc.querySelectorAll('img');
-          allImages.forEach((img) => {
-            const htmlImg = img as HTMLImageElement;
-            htmlImg.style.visibility = 'visible';
-            htmlImg.style.display = '';
-            htmlImg.style.opacity = '1';
-            // Only show images that have a valid src
-            if (!htmlImg.src || htmlImg.src === '' || htmlImg.src.startsWith('data:,')) {
-              htmlImg.style.display = 'none';
-            }
-          });
-          
-          // Ensure icons (Font Awesome, etc.) are visible
-          const allIcons = clonedDoc.querySelectorAll('i, .fa, [class*="fa-"], svg');
-          allIcons.forEach((icon) => {
-            const htmlIcon = icon as HTMLElement;
-            htmlIcon.style.visibility = 'visible';
-            htmlIcon.style.display = '';
-            htmlIcon.style.opacity = '1';
           });
           
           // Ensure the page element has proper background
@@ -1275,8 +1190,8 @@ Calories: 320 per serving
             void htmlEl.scrollHeight;
           });
           
-          // Then handle other text elements (serving, prep time, etc.)
-          const textElements = clonedDoc.querySelectorAll('p, span, li, div, .info-list, .info-list li, .meta-item, .meta, .website, .title-section, .ingredients-cell, .directions-cell, .notes-cell');
+          // Then handle other text elements
+          const textElements = clonedDoc.querySelectorAll('p, span, li, div, .info-list li');
           textElements.forEach((element) => {
             const htmlEl = element as HTMLElement;
             // Ensure visibility
@@ -1294,23 +1209,9 @@ Calories: 320 per serving
               htmlEl.style.letterSpacing = computedStyle.letterSpacing;
               htmlEl.style.color = computedStyle.color;
               htmlEl.style.lineHeight = computedStyle.lineHeight;
-              // Ensure display is not none
-              if (computedStyle.display === 'none') {
-                htmlEl.style.display = '';
-              }
             }
             // Force reflow to ensure font is loaded and rendered
             void htmlEl.offsetHeight;
-          });
-          
-          // Specifically ensure meta items (serving, prep time) are visible
-          const metaItems = clonedDoc.querySelectorAll('.meta-item, .info-cell, .info-list li');
-          metaItems.forEach((item) => {
-            const htmlItem = item as HTMLElement;
-            htmlItem.style.visibility = 'visible';
-            htmlItem.style.display = '';
-            htmlItem.style.opacity = '1';
-            void htmlItem.offsetHeight;
           });
           
           // Force pseudo-elements to render by ensuring parent has proper styles
