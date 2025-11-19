@@ -907,7 +907,33 @@ Calories: 320 per serving
       }
 
       // Wait a bit more for CSS pseudo-elements (::before, ::after) to render
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Also ensure fonts are fully rendered
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Double-check that fonts are loaded by checking font status
+      try {
+        if (iframeDoc.fonts && iframeDoc.fonts.check) {
+          // Wait a bit more if fonts aren't ready
+          // Check a few common font combinations
+          const fontChecks = [
+            'normal 400 16px "Cormorant Garamond"',
+            'normal 500 16px "Cormorant Garamond"',
+            'normal 400 16px "Sweet Apricot"',
+            'normal 300 16px "Sweet Apricot"',
+            'normal 400 16px "Arimo"',
+            'normal 500 16px "Arimo"'
+          ];
+          const allFontsReady = fontChecks.every(fontDesc => {
+            return iframeDoc.fonts.check(fontDesc);
+          });
+          if (!allFontsReady) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
+      } catch (e) {
+        // Font checking not available, just wait
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
 
       // Ensure proper z-index stacking before capture
       const allElements = iframeDoc.querySelectorAll('*');
@@ -983,7 +1009,39 @@ Calories: 320 per serving
           }
           
           // Ensure all headings and text elements are visible and properly styled with fonts
-          const textElements = clonedDoc.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span, li, div, .section-title, .directions-title, .notes-title, .ingredients-container h2, .title-section h1, .info-list li');
+          // Prioritize headings first as they're most critical
+          const headings = clonedDoc.querySelectorAll('h1, h2, h3, h4, h5, h6, .section-title, .directions-title, .notes-title, .ingredients-container h2, .title-section h1, .title-main');
+          headings.forEach((element) => {
+            const htmlEl = element as HTMLElement;
+            // Ensure visibility
+            htmlEl.style.visibility = 'visible';
+            htmlEl.style.display = '';
+            htmlEl.style.opacity = '1';
+            // Access computed style to get actual font properties
+            const computedStyle = clonedDoc.defaultView?.getComputedStyle(htmlEl);
+            if (computedStyle) {
+              // Preserve all font-related properties with explicit values
+              // Use setProperty with important flag to override any conflicting styles
+              htmlEl.style.setProperty('font-family', computedStyle.fontFamily, 'important');
+              htmlEl.style.setProperty('font-size', computedStyle.fontSize, 'important');
+              htmlEl.style.setProperty('font-weight', computedStyle.fontWeight, 'important');
+              htmlEl.style.setProperty('font-style', computedStyle.fontStyle, 'important');
+              htmlEl.style.setProperty('letter-spacing', computedStyle.letterSpacing, 'important');
+              htmlEl.style.setProperty('color', computedStyle.color, 'important');
+              htmlEl.style.setProperty('line-height', computedStyle.lineHeight, 'important');
+              htmlEl.style.setProperty('text-transform', computedStyle.textTransform, 'important');
+              // Ensure no transform is shrinking the text
+              htmlEl.style.setProperty('transform', 'none', 'important');
+              htmlEl.style.setProperty('scale', '1', 'important');
+            }
+            // Force reflow multiple times to ensure font is loaded and rendered
+            void htmlEl.offsetHeight;
+            void htmlEl.offsetWidth;
+            void htmlEl.scrollHeight;
+          });
+          
+          // Then handle other text elements
+          const textElements = clonedDoc.querySelectorAll('p, span, li, div, .info-list li');
           textElements.forEach((element) => {
             const htmlEl = element as HTMLElement;
             // Ensure visibility
@@ -993,7 +1051,7 @@ Calories: 320 per serving
             // Access computed style to get actual font properties
             const computedStyle = clonedDoc.defaultView?.getComputedStyle(htmlEl);
             if (computedStyle) {
-              // Preserve all font-related properties to ensure fonts render correctly
+              // Preserve all font-related properties
               htmlEl.style.fontFamily = computedStyle.fontFamily;
               htmlEl.style.fontSize = computedStyle.fontSize;
               htmlEl.style.fontWeight = computedStyle.fontWeight;
