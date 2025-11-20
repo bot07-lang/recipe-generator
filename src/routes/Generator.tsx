@@ -103,12 +103,12 @@ function getFieldBlock(text: string, label: string): string {
     return "";
   }
   
-  // For No. of Servings, try "No. of Servings", "Servings", and "Serving" (singular)
-  if (label.includes('No\\. of Servings') || label.includes('Servings') || label.includes('Serving')) {
+  // For No. of Servings, try both "No. of Servings" and "Servings"
+  if (label.includes('No\\. of Servings') || label.includes('Servings')) {
     const lookaheadPattern = '(Recipe |Difficulty|No\\.|Preparation\\s+Time|Cooking|Rest|Total|Cooking Temp|Calories|Best Season|Website|###|$)';
     const patterns = [
-      `No\\.\\s*of\\s*Servings?\\s*:\\s*([\\s\\S]*?)(?=\\n${lookaheadPattern})`,
-      `Servings?\\s*:\\s*([\\s\\S]*?)(?=\\n${lookaheadPattern})`
+      `No\\.\\s*of\\s*Servings\\s*:\\s*([\\s\\S]*?)(?=\\n${lookaheadPattern})`,
+      `Servings\\s*:\\s*([\\s\\S]*?)(?=\\n${lookaheadPattern})`
     ];
     for (const pattern of patterns) {
       const re = new RegExp(pattern, "i");
@@ -232,7 +232,7 @@ function parseRecipeData(t: string) {
   const title       = getFieldBlock(t, "Recipe Title");
   const description = getFieldBlock(t, "Recipe Description");
   const difficulty  = getFieldBlock(t, "Difficulty Level");
-  const servings    = getFieldBlock(t, "No\\. of Servings") || getFieldBlock(t, "Servings") || getFieldBlock(t, "Serving");
+  const servings    = getFieldBlock(t, "No\\. of Servings") || getFieldBlock(t, "Servings");
   const prep        = getFieldBlock(t, "Preparation Time \\(Minutes\\)");
   const cook        = getFieldBlock(t, "Cooking Time \\(Minutes\\)");
   const rest        = getFieldBlock(t, "Rest Time \\(Minutes\\)");
@@ -378,7 +378,6 @@ Calories: 320 per serving
   const [generatedHtml, setGeneratedHtml] = useState('');
   const [pngUrl, setPngUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingTemplateHtml, setEditingTemplateHtml] = useState('');
@@ -482,25 +481,13 @@ Calories: 320 per serving
   }
 
   useEffect(() => {
-    let mounted = true;
-    
-    async function init() {
-      try {
-        await loadTemplates();
-      } catch (error) {
-        if (mounted) {
-          console.error('Failed to initialize templates:', error);
-        }
-      }
-    }
-    
-    init();
+    loadTemplates();
     
     // Reload templates when page becomes visible after being hidden
     // (helps when new templates are added in Developer page)
     let wasHidden = document.hidden;
     const handleVisibilityChange = () => {
-      if (wasHidden && !document.hidden && mounted) {
+      if (wasHidden && !document.hidden) {
         // Page was hidden and now visible - reload templates
         loadTemplates();
       }
@@ -509,34 +496,20 @@ Calories: 320 per serving
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
     return () => {
-      mounted = false;
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
   async function loadTemplates() {
-    setIsLoadingTemplates(true);
     try {
-      // Add timeout to prevent infinite loading (10 seconds)
-      const timeoutId = setTimeout(() => {
-        console.warn('Template loading taking too long, using defaults');
-        setTemplates(DEFAULT_TEMPLATES);
-        setIsLoadingTemplates(false);
-        setNotification({ message: 'Loading timeout. Using default templates.', type: 'info' });
-      }, 10000);
-
       const { data, error } = await supabase
         .from('templates')
         .select('*')
         .order('created_at', { ascending: false });
 
-      clearTimeout(timeoutId);
-
       if (error) {
         console.error('Error loading templates:', error);
         setTemplates(DEFAULT_TEMPLATES);
-        setIsLoadingTemplates(false);
-        setNotification({ message: 'Failed to load templates. Using defaults.', type: 'error' });
         return;
       }
 
@@ -547,12 +520,9 @@ Calories: 320 per serving
         setTemplates(DEFAULT_TEMPLATES);
         await insertDefaultTemplates();
       }
-      setIsLoadingTemplates(false);
     } catch (error) {
       console.error('Error loading templates:', error);
       setTemplates(DEFAULT_TEMPLATES);
-      setIsLoadingTemplates(false);
-      setNotification({ message: 'Connection error. Using default templates.', type: 'error' });
     }
   }
 
@@ -784,498 +754,297 @@ Calories: 320 per serving
     if (!filledHtml) return;
     
     setIsGenerating(true);
+    
+    // Check if template uses Google Fonts (needs iframe approach)
+    const usesGoogleFonts = filledHtml.includes('fonts.googleapis.com') || filledHtml.includes('fonts.gstatic.com');
     let iframe: HTMLIFrameElement | null = null;
     
     try {
-      // Create an iframe for better isolation and proper rendering of external resources
-      iframe = document.createElement('iframe');
-      iframe.style.position = 'absolute';
-      iframe.style.left = '-9999px';
-      iframe.style.top = '0';
-      iframe.style.width = '2100px'; // A4 width at 2x scale
-      iframe.style.height = '2970px'; // A4 height at 2x scale
-      iframe.style.border = 'none';
-      document.body.appendChild(iframe);
+      if (usesGoogleFonts) {
+        // Use iframe approach for templates with Google Fonts
+        iframe = document.createElement('iframe');
+        iframe.style.position = 'absolute';
+        iframe.style.left = '-9999px';
+        iframe.style.top = '0';
+        iframe.style.width = '2000px';
+        iframe.style.height = '3000px';
+        iframe.style.border = 'none';
+        iframe.style.overflow = 'visible';
+        document.body.appendChild(iframe);
 
-      // Wait for iframe to be ready
-      await new Promise<void>((resolve) => {
-        if (iframe) {
-          iframe.onload = () => resolve();
-          iframe.srcdoc = filledHtml;
+        // Wait for iframe to be ready
+        await new Promise<void>((resolve) => {
+          if (iframe) {
+            iframe.onload = () => resolve();
+            iframe.srcdoc = filledHtml;
           } else {
-          resolve();
-        }
-      });
-
-      // Wait a bit for initial render
-      await new Promise(resolve => setTimeout(resolve, 200));
-
-      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-      if (!iframeDoc) {
-        throw new Error('Could not access iframe document');
-      }
-
-      // Dynamically detect and preload fonts actually used in the document
-      // This forces the browser to load fonts before html2canvas captures
-      const docElements = iframeDoc.querySelectorAll('*');
-      const fontFamilies = new Set<string>();
-      const fontWeights = new Set<string>();
-      
-      docElements.forEach((el) => {
-        const computedStyle = iframeDoc.defaultView?.getComputedStyle(el as HTMLElement);
-        if (computedStyle) {
-          const fontFamily = computedStyle.fontFamily;
-          const fontWeight = computedStyle.fontWeight;
-          // Extract font family name (remove quotes and fallbacks)
-          // Match quoted fonts first, then unquoted fonts before comma
-          const fontMatch = fontFamily.match(/['"]([^'"]+)['"]|([^,]+)/);
-          if (fontMatch) {
-            let fontName = (fontMatch[1] || fontMatch[2] || '').trim();
-            // Only exclude generic font families, keep custom fonts even if they're serif/sans-serif/cursive
-            if (fontName && 
-                fontName !== 'serif' && 
-                fontName !== 'sans-serif' && 
-                fontName !== 'cursive' &&
-                fontName !== 'monospace' &&
-                fontName !== 'fantasy' &&
-                !fontName.startsWith('ui-')) {
-              fontFamilies.add(fontName);
-            }
+            resolve();
           }
-          if (fontWeight) {
-            fontWeights.add(fontWeight);
-          }
+        });
+
+        // Wait for initial render
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (!iframeDoc) {
+          throw new Error('Could not access iframe document');
         }
-      });
-      
-      // Create font preloader with detected fonts
-      if (fontFamilies.size > 0) {
-        const fontPreloader = iframeDoc.createElement('div');
-        fontPreloader.style.position = 'absolute';
-        fontPreloader.style.visibility = 'hidden';
-        fontPreloader.style.width = '1px';
-        fontPreloader.style.height = '1px';
-        fontPreloader.style.overflow = 'hidden';
         
-        const preloaderHTML = Array.from(fontFamilies).map(font => {
-          return Array.from(fontWeights).map(weight => {
-            return `<span style="font-family: '${font}'; font-weight: ${weight}; font-size: 50px;">.</span>`;
-          }).join('');
-        }).join('');
-        
-        fontPreloader.innerHTML = preloaderHTML;
-        iframeDoc.body.appendChild(fontPreloader);
-        
-        // Force font loading by measuring the element
-        void fontPreloader.offsetHeight;
-      }
+        // Ensure iframe body/html are properly set up
+        if (iframeDoc.body) {
+          iframeDoc.body.style.margin = '0';
+          iframeDoc.body.style.padding = '0';
+          iframeDoc.body.style.overflow = 'visible';
+        }
+        if (iframeDoc.documentElement) {
+          iframeDoc.documentElement.style.overflow = 'visible';
+        }
 
-      // Wait for all images to load (including base64)
-      await new Promise<void>((resolve) => {
-        const images = Array.from(iframeDoc.querySelectorAll('img')) as HTMLImageElement[];
-        const stylesheets = Array.from(iframeDoc.querySelectorAll('link[rel="stylesheet"]')) as HTMLLinkElement[];
-        
-        let imagesLoaded = 0;
-        let stylesheetsLoaded = 0;
-        const totalResources = images.length + stylesheets.length;
-
-        const checkComplete = async () => {
-          if (imagesLoaded + stylesheetsLoaded >= totalResources) {
-            // Wait for fonts to be fully loaded using Font Loading API
-            try {
-              if (iframeDoc.fonts && iframeDoc.fonts.ready) {
-                await iframeDoc.fonts.ready;
-              }
-            } catch (e) {
-              console.warn('Font loading API not available:', e);
-            }
-            // Extra wait for fonts and CSS pseudo-elements to render
+        // Wait for stylesheets (Google Fonts) to load
+        await new Promise<void>((resolve) => {
+          const stylesheets = Array.from(iframeDoc.querySelectorAll('link[rel="stylesheet"]')) as HTMLLinkElement[];
+          if (stylesheets.length === 0) {
             setTimeout(() => resolve(), 1000);
+            return;
           }
-        };
-
-        if (totalResources === 0) {
-          // No images or stylesheets, but still wait for fonts
-          (async () => {
-            try {
-              if (iframeDoc.fonts && iframeDoc.fonts.ready) {
-                await iframeDoc.fonts.ready;
-              }
-            } catch (e) {
-              console.warn('Font loading API not available:', e);
-            }
-            setTimeout(() => resolve(), 1500);
-          })();
-          return;
-        }
-
-        // Wait for images
-        images.forEach((imgEl) => {
-          if (imgEl.complete && imgEl.naturalWidth > 0) {
-            imagesLoaded++;
-            checkComplete();
-          } else {
-            imgEl.onload = () => {
-              imagesLoaded++;
-              checkComplete();
-            };
-            imgEl.onerror = () => {
-              imagesLoaded++;
-              checkComplete();
-            };
-          }
-        });
-
-        // Wait for stylesheets (fonts)
-        stylesheets.forEach((link) => {
-          if (link.sheet) {
-            stylesheetsLoaded++;
-            checkComplete();
-          } else {
-            link.onload = () => {
-              stylesheetsLoaded++;
-              checkComplete();
-            };
-            link.onerror = () => {
-              stylesheetsLoaded++;
-              checkComplete();
-            };
-          }
-        });
-
-        // Fallback timeout
-        setTimeout(() => {
-          resolve();
-        }, 8000);
-      });
-
-      // Find the main container element (try multiple selectors)
-      const cardElement = iframeDoc.querySelector('.page') || 
-                         iframeDoc.querySelector('.recipe-card') || 
-                         iframeDoc.querySelector('.card') || 
-                         iframeDoc.querySelector('.container') ||
-                         iframeDoc.querySelector('.recipe-grid') ||
-                         iframeDoc.body;
-
-      if (!cardElement) {
-        throw new Error('Could not find container element');
-      }
-
-      // Wait a bit more for CSS pseudo-elements (::before, ::after) to render
-      // Also ensure fonts are fully rendered
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Aggressively wait for fonts to load
-      let fontLoadAttempts = 0;
-      const maxAttempts = 10;
-      while (fontLoadAttempts < maxAttempts) {
-        try {
-          if (iframeDoc.fonts && iframeDoc.fonts.ready) {
-            await iframeDoc.fonts.ready;
-            // Additional wait after fonts.ready
-            await new Promise(resolve => setTimeout(resolve, 300));
-            
-            // Verify fonts are actually loaded (check all fonts in document)
-            if (iframeDoc.fonts.check && iframeDoc.fonts.size > 0) {
-              // Check if all fonts in the document are loaded
-              let allFontsReady = true;
+          
+          let stylesheetsLoaded = 0;
+          const checkComplete = async () => {
+            if (stylesheetsLoaded >= stylesheets.length) {
+              // Wait for fonts to be fully loaded using Font Loading API
               try {
-                for (const font of iframeDoc.fonts) {
-                  // Use a standard size for checking
-                  const fontDesc = `${font.style} ${font.weight} 16px "${font.family}"`;
-                  if (!iframeDoc.fonts.check(fontDesc)) {
-                    allFontsReady = false;
-                    break;
-                  }
+                if (iframeDoc.fonts && iframeDoc.fonts.ready) {
+                  await iframeDoc.fonts.ready;
                 }
               } catch (e) {
-                // If we can't check, assume ready after waiting
-                allFontsReady = fontLoadAttempts >= 3;
+                console.warn('Font loading API not available:', e);
               }
-              if (allFontsReady) {
-                break; // All fonts loaded, exit loop
-              }
+              setTimeout(() => resolve(), 1000);
+            }
+          };
+
+          stylesheets.forEach((link) => {
+            if (link.sheet) {
+              stylesheetsLoaded++;
+              checkComplete();
             } else {
-              // No fonts to check or API not available, wait a bit then proceed
-              if (fontLoadAttempts >= 2) {
-                break;
-              }
+              link.onload = () => {
+                stylesheetsLoaded++;
+                checkComplete();
+              };
+              link.onerror = () => {
+                stylesheetsLoaded++;
+                checkComplete();
+              };
             }
-          } else {
-            break; // Font API not available
+          });
+
+          // Fallback timeout
+          setTimeout(() => {
+            resolve();
+          }, 6000);
+        });
+
+        // Wait for images to load
+        await new Promise<void>((resolve) => {
+          const images = Array.from(iframeDoc.querySelectorAll('img')) as HTMLImageElement[];
+          if (images.length === 0) {
+            resolve();
+            return;
           }
-        } catch (e) {
-          console.warn('Font loading check error:', e);
+          
+          let imagesLoaded = 0;
+          images.forEach((imgEl) => {
+            if (imgEl.complete && (imgEl.naturalWidth > 0 || imgEl.src.startsWith('data:'))) {
+              imagesLoaded++;
+              if (imagesLoaded >= images.length) resolve();
+            } else {
+              imgEl.onload = () => {
+                imagesLoaded++;
+                if (imagesLoaded >= images.length) resolve();
+              };
+              imgEl.onerror = () => {
+                imagesLoaded++;
+                if (imagesLoaded >= images.length) resolve();
+              };
+            }
+          });
+          
+          // Fallback timeout
+          setTimeout(() => resolve(), 5000);
+        });
+
+        // Find the main container element (support multiple template structures)
+        const cardElement = iframeDoc.querySelector('.page') || 
+                           iframeDoc.querySelector('.recipe-card') || 
+                           iframeDoc.querySelector('.card') || 
+                           iframeDoc.querySelector('.container') ||
+                           iframeDoc.querySelector('.recipe-grid') ||
+                           iframeDoc.body;
+
+        if (!cardElement) {
+          throw new Error('Could not find container element');
         }
+
+        // Wait a bit more for fonts to fully render
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Generate PNG using html2canvas
+        const canvas = await html2canvas(cardElement as HTMLElement, {
+          backgroundColor: '#ffffff',
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          logging: false
+        });
+
+        // Clean up iframe
+        if (iframe && iframe.parentNode) {
+          document.body.removeChild(iframe);
+        }
+
+        // Convert to JPEG blob
+        const blob = await new Promise<Blob>((resolve, reject) => {
+          canvas.toBlob((blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Failed to create blob'));
+            }
+          }, 'image/jpeg', 0.92);
+        });
         
-        fontLoadAttempts++;
-        if (fontLoadAttempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 200));
-        }
-      }
-      
-      // Final wait to ensure everything is rendered
-      await new Promise(resolve => setTimeout(resolve, 500));
+        const url = URL.createObjectURL(blob);
+        setPngUrl(url);
+        
+        // Auto-download
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `recipe-card-${Date.now()}.jpg`;
+        link.click();
+        
+        setNotification({ message: 'Recipe card image generated and downloaded!', type: 'success' });
+      } else {
+        // Use simple div approach for templates without Google Fonts
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = filledHtml;
+        tempDiv.style.position = 'absolute';
+        tempDiv.style.left = '-9999px';
+        tempDiv.style.top = '-9999px';
+        tempDiv.style.display = 'inline-block';
+        document.body.appendChild(tempDiv);
 
-      // Ensure proper z-index stacking before capture
-      const allElements = iframeDoc.querySelectorAll('*');
-      allElements.forEach((el) => {
-        const htmlEl = el as HTMLElement;
-        const computedStyle = iframeDoc.defaultView?.getComputedStyle(htmlEl);
-        if (computedStyle) {
-          // Force reflow to ensure z-index is applied
-          void htmlEl.offsetHeight;
+        // Wait for content to render and all images to load
+        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise(resolve => {
+          const images = Array.from(tempDiv.querySelectorAll('img')) as HTMLImageElement[];
+          if (images.length === 0) return resolve(undefined);
+          let remaining = images.length;
+          images.forEach(imgEl => {
+            if (imgEl.complete) {
+              remaining -= 1;
+              if (remaining === 0) resolve(undefined);
+            } else {
+              const done = () => { remaining -= 1; if (remaining === 0) resolve(undefined); };
+              imgEl.onload = done;
+              imgEl.onerror = done;
+            }
+          });
+        });
+        
+        // Get the actual card element (without body padding)
+        // Many templates use `.recipe-card`; fall back to `.card` or the container
+        const cardElement = (tempDiv.querySelector('.recipe-card') || tempDiv.querySelector('.card') || tempDiv) as HTMLElement;
+        
+        // Optionally constrain export width to a Canva-like size (keeps aspect ratio)
+        const exportWidth = 1080; // change if you want 1200/1920/etc.
+        const prevWidth = (cardElement as HTMLElement).style.width;
+        if (exportWidth) {
+          (cardElement as HTMLElement).style.width = `${exportWidth}px`;
         }
-      });
 
-      // Get the actual background color from the page element
-      const pageStyle = iframeDoc.defaultView?.getComputedStyle(cardElement as HTMLElement);
-      const pageBgColor = pageStyle?.backgroundColor || '#ffffff';
-      
-      // Generate PNG using html2canvas
-      const canvas = await html2canvas(cardElement as HTMLElement, {
-        backgroundColor: pageBgColor !== 'rgba(0, 0, 0, 0)' && pageBgColor !== 'transparent' ? pageBgColor : '#ffffff',
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
-        windowWidth: iframeDoc.documentElement.scrollWidth,
-        windowHeight: iframeDoc.documentElement.scrollHeight,
-        // Important: enable these for better rendering
-        removeContainer: false,
-        imageTimeout: 15000,
-        ignoreElements: (element) => {
-          // Don't ignore any elements - we want everything
-          return false;
-        },
-        onclone: (clonedDoc, element) => {
-          // Ensure all styles are preserved in the clone
-          const clonedBody = clonedDoc.body;
-          if (clonedBody) {
-            clonedBody.style.visibility = 'visible';
-            // Ensure body background is visible
-            const bodyStyle = clonedDoc.defaultView?.getComputedStyle(clonedBody);
-            if (bodyStyle && bodyStyle.backgroundColor && bodyStyle.backgroundColor !== 'rgba(0, 0, 0, 0)') {
-              clonedBody.style.backgroundColor = bodyStyle.backgroundColor;
-            }
-          }
-          
-          // Ensure container elements have visible overflow to prevent clipping headings
-          const containers = clonedDoc.querySelectorAll('.page, .recipe-grid, .container, .recipe-card, .card');
-          containers.forEach((container) => {
-            const htmlEl = container as HTMLElement;
-            const computedStyle = clonedDoc.defaultView?.getComputedStyle(htmlEl);
-            if (computedStyle && computedStyle.overflow === 'hidden') {
-              // Change overflow to visible to prevent clipping headings
-              htmlEl.style.overflow = 'visible';
-            }
-            // Also ensure parent sections don't clip
-            const parent = htmlEl.parentElement;
-            if (parent) {
-              const parentStyle = clonedDoc.defaultView?.getComputedStyle(parent);
-              if (parentStyle && parentStyle.overflow === 'hidden') {
-                (parent as HTMLElement).style.overflow = 'visible';
-              }
-            }
-          });
-          
-          // Ensure the page element has proper background
-          const clonedPage = clonedDoc.querySelector('.page') as HTMLElement;
-          if (clonedPage) {
-            const clonedPageStyle = clonedDoc.defaultView?.getComputedStyle(clonedPage);
-            if (clonedPageStyle && clonedPageStyle.backgroundColor && clonedPageStyle.backgroundColor !== 'rgba(0, 0, 0, 0)') {
-              clonedPage.style.backgroundColor = clonedPageStyle.backgroundColor;
-            }
-            // Force reflow to ensure background is applied
-            void clonedPage.offsetHeight;
-          }
-          
-          // CRITICAL: Re-apply font preloader in clone using fonts from the cloned document
-          // Dynamically detect fonts used in the cloned document
-          const clonedDocElements = clonedDoc.querySelectorAll('*');
-          const clonedFontFamilies = new Set<string>();
-          const clonedFontWeights = new Set<string>();
-          
-          clonedDocElements.forEach((el) => {
-            const computedStyle = clonedDoc.defaultView?.getComputedStyle(el as HTMLElement);
-            if (computedStyle) {
-              const fontFamily = computedStyle.fontFamily;
-              const fontWeight = computedStyle.fontWeight;
-              // Extract font family name (remove quotes and fallbacks)
-              // Match quoted fonts first, then unquoted fonts before comma
-              const fontMatch = fontFamily.match(/['"]([^'"]+)['"]|([^,]+)/);
-              if (fontMatch) {
-                let fontName = (fontMatch[1] || fontMatch[2] || '').trim();
-                // Only exclude generic font families, keep custom fonts even if they're serif/sans-serif/cursive
-                if (fontName && 
-                    fontName !== 'serif' && 
-                    fontName !== 'sans-serif' && 
-                    fontName !== 'cursive' &&
-                    fontName !== 'monospace' &&
-                    fontName !== 'fantasy' &&
-                    !fontName.startsWith('ui-')) {
-                  clonedFontFamilies.add(fontName);
-                }
-              }
-              if (fontWeight) {
-                clonedFontWeights.add(fontWeight);
-              }
-            }
-          });
-          
-          // Create font preloader with detected fonts
-          if (clonedFontFamilies.size > 0 && clonedDoc.body) {
-            const clonedFontPreloader = clonedDoc.createElement('div');
-            clonedFontPreloader.style.position = 'absolute';
-            clonedFontPreloader.style.visibility = 'hidden';
-            clonedFontPreloader.style.width = '1px';
-            clonedFontPreloader.style.height = '1px';
-            clonedFontPreloader.style.overflow = 'hidden';
+        // Wait a bit more for CSS pseudo-elements to render
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        // Generate PNG using html2canvas on the card element directly
+        const canvas = await html2canvas(cardElement, {
+          backgroundColor: '#ffffff',
+          scale: 2, // increase scale for sharper output at fixed width
+          useCORS: true,
+          allowTaint: true,
+          onclone: (clonedDoc, element) => {
+            // Ensure all elements are visible
+            const allElements = clonedDoc.querySelectorAll('*');
+            allElements.forEach((el) => {
+              const htmlEl = el as HTMLElement;
+              htmlEl.style.visibility = 'visible';
+              htmlEl.style.display = '';
+              htmlEl.style.opacity = '1';
+            });
             
-            const preloaderHTML = Array.from(clonedFontFamilies).map(font => {
-              return Array.from(clonedFontWeights).map(weight => {
-                return `<span style="font-family: '${font}'; font-weight: ${weight}; font-size: 50px;">.</span>`;
-              }).join('');
-            }).join('');
-            
-            clonedFontPreloader.innerHTML = preloaderHTML;
-            clonedDoc.body.appendChild(clonedFontPreloader);
-            void clonedFontPreloader.offsetHeight;
-          }
-          
-          // Ensure all headings and text elements are visible and properly styled with fonts
-          // Prioritize headings first as they're most critical
-          const headings = clonedDoc.querySelectorAll('h1, h2, h3, h4, h5, h6, .section-title, .directions-title, .notes-title, .ingredients-container h2, .title-section h1, .title-main');
-          headings.forEach((element) => {
-            const htmlEl = element as HTMLElement;
-            // Ensure visibility
-            htmlEl.style.visibility = 'visible';
-            htmlEl.style.display = '';
-            htmlEl.style.opacity = '1';
-            // Access computed style to get actual font properties
-            const computedStyle = clonedDoc.defaultView?.getComputedStyle(htmlEl);
-            if (computedStyle) {
-              // Get the actual computed font size to prevent shrinking
-              const fontSize = computedStyle.fontSize;
-              const fontFamily = computedStyle.fontFamily;
-              
-              // Preserve all font-related properties with explicit values
-              // Use setProperty with important flag to override any conflicting styles
-              htmlEl.style.setProperty('font-family', fontFamily, 'important');
-              htmlEl.style.setProperty('font-size', fontSize, 'important');
-              htmlEl.style.setProperty('font-weight', computedStyle.fontWeight, 'important');
-              htmlEl.style.setProperty('font-style', computedStyle.fontStyle, 'important');
-              htmlEl.style.setProperty('letter-spacing', computedStyle.letterSpacing, 'important');
-              htmlEl.style.setProperty('color', computedStyle.color, 'important');
-              htmlEl.style.setProperty('line-height', computedStyle.lineHeight, 'important');
-              htmlEl.style.setProperty('text-transform', computedStyle.textTransform, 'important');
-              // Ensure no transform is shrinking the text
-              htmlEl.style.setProperty('transform', 'none', 'important');
-              htmlEl.style.setProperty('scale', '1', 'important');
-              htmlEl.style.setProperty('zoom', '1', 'important');
-              
-              // Force the browser to use the correct font by creating a test element
-              const testSpan = clonedDoc.createElement('span');
-              testSpan.style.fontFamily = fontFamily;
-              testSpan.style.fontSize = fontSize;
-              testSpan.style.position = 'absolute';
-              testSpan.style.visibility = 'hidden';
-              testSpan.textContent = 'M';
-              clonedDoc.body.appendChild(testSpan);
-              void testSpan.offsetWidth;
-            }
-            // Force reflow multiple times to ensure font is loaded and rendered
-            void htmlEl.offsetHeight;
-            void htmlEl.offsetWidth;
-            void htmlEl.scrollHeight;
-          });
-          
-          // Then handle other text elements
-          const textElements = clonedDoc.querySelectorAll('p, span, li, div, .info-list li');
-          textElements.forEach((element) => {
-            const htmlEl = element as HTMLElement;
-            // Ensure visibility
-            htmlEl.style.visibility = 'visible';
-            htmlEl.style.display = '';
-            htmlEl.style.opacity = '1';
-            // Access computed style to get actual font properties
-            const computedStyle = clonedDoc.defaultView?.getComputedStyle(htmlEl);
-            if (computedStyle) {
-              // Preserve all font-related properties
-              htmlEl.style.fontFamily = computedStyle.fontFamily;
-              htmlEl.style.fontSize = computedStyle.fontSize;
-              htmlEl.style.fontWeight = computedStyle.fontWeight;
-              htmlEl.style.fontStyle = computedStyle.fontStyle;
-              htmlEl.style.letterSpacing = computedStyle.letterSpacing;
-              htmlEl.style.color = computedStyle.color;
-              htmlEl.style.lineHeight = computedStyle.lineHeight;
-            }
-            // Force reflow to ensure font is loaded and rendered
-            void htmlEl.offsetHeight;
-          });
-          
-          // Force pseudo-elements to render by ensuring parent has proper styles
-          // Note: html2canvas has limited support for ::before and ::after with background images
-          // But we can try to force them by ensuring the parent element is properly styled
-          const pageElement = clonedDoc.querySelector('.page');
-          if (pageElement) {
-            const htmlEl = pageElement as HTMLElement;
-            // Force reflow to ensure pseudo-elements are rendered
-            void htmlEl.offsetHeight;
-            // Access computed styles to trigger rendering
-            const beforeStyle = clonedDoc.defaultView?.getComputedStyle(htmlEl, '::before');
-            const afterStyle = clonedDoc.defaultView?.getComputedStyle(htmlEl, '::after');
-            // Force another reflow
-            void htmlEl.offsetHeight;
-          }
-          
-          // Force z-index recalculation in clone
-          const allElements = clonedDoc.querySelectorAll('*');
-          allElements.forEach((el) => {
-            const htmlEl = el as HTMLElement;
-            const computedStyle = clonedDoc.defaultView?.getComputedStyle(htmlEl);
-            if (computedStyle && computedStyle.position !== 'static') {
-              // Ensure z-index is preserved
+            // Force pseudo-elements to render by accessing their computed styles
+            const elementsWithPseudo = clonedDoc.querySelectorAll('.ingredients-list li, .instructions-list li, .meta span');
+            elementsWithPseudo.forEach((el) => {
+              const htmlEl = el as HTMLElement;
+              // Access computed styles to trigger pseudo-element rendering
+              const beforeStyle = clonedDoc.defaultView?.getComputedStyle(htmlEl, '::before');
+              const afterStyle = clonedDoc.defaultView?.getComputedStyle(htmlEl, '::after');
+              // Force reflow
               void htmlEl.offsetHeight;
+            });
+            
+            // Ensure headings are visible and properly styled
+            const headings = clonedDoc.querySelectorAll('h1, h2, h3, h4, h5, h6');
+            headings.forEach((heading) => {
+              const htmlHeading = heading as HTMLElement;
+              htmlHeading.style.visibility = 'visible';
+              htmlHeading.style.display = '';
+              htmlHeading.style.opacity = '1';
+              void htmlHeading.offsetHeight;
+            });
+            
+            // Ensure emoji icons in meta spans are visible
+            const metaSpans = clonedDoc.querySelectorAll('.meta span');
+            metaSpans.forEach((span) => {
+              const htmlSpan = span as HTMLElement;
+              htmlSpan.style.visibility = 'visible';
+              htmlSpan.style.display = '';
+              htmlSpan.style.opacity = '1';
+              // Force font rendering for emojis
+              htmlSpan.style.fontFamily = 'Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"';
+              void htmlSpan.offsetHeight;
+            });
+          }
+        });
+
+        // Restore original width after capture
+        (cardElement as HTMLElement).style.width = prevWidth;
+
+        // Clean up
+        document.body.removeChild(tempDiv);
+
+        // Convert to JPEG blob with compression for smaller file size
+        const blob = await new Promise<Blob>((resolve, reject) => {
+          canvas.toBlob((blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Failed to create blob'));
             }
-          });
-        }
-      });
-
-      // Clean up iframe and font preloader
-      if (iframe && iframe.parentNode) {
-        // Remove font preloader from iframe before removing iframe
-        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-        if (iframeDoc) {
-          const preloader = iframeDoc.querySelector('div[style*="visibility: hidden"]');
-          if (preloader && preloader.parentNode) {
-            preloader.parentNode.removeChild(preloader);
-          }
-        }
-        document.body.removeChild(iframe);
+          }, 'image/jpeg', 0.85); // JPEG with 85% quality for smaller file size
+        });
+        const url = URL.createObjectURL(blob);
+        
+        setPngUrl(url);
+        
+        // Auto-download
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `recipe-card-${Date.now()}.jpg`;
+        link.click();
+        
+        setNotification({ message: 'Recipe card image generated and downloaded!', type: 'success' });
       }
-
-      // Convert to JPEG blob with compression
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((blob) => {
-          if (blob) {
-            resolve(blob);
-          } else {
-            reject(new Error('Failed to create blob'));
-          }
-        }, 'image/jpeg', 0.92); // Higher quality for better output
-      });
-      
-      const url = URL.createObjectURL(blob);
-      setPngUrl(url);
-      
-      // Auto-download
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `recipe-card-${Date.now()}.jpg`;
-      link.click();
-      
-      setNotification({ message: 'Recipe card image generated and downloaded!', type: 'success' });
     } catch (err) {
       console.error('Failed to generate image:', err);
       setNotification({ message: `Failed to generate image: ${err instanceof Error ? err.message : 'Unknown error'}. Please try again.`, type: 'error' });
@@ -1293,16 +1062,6 @@ Calories: 320 per serving
     <div className="generator-shell">
       <div className="page-title">Generator</div>
       {/* Template gallery (uses Figma-like preview images; mapped by template id) */}
-      {isLoadingTemplates && (
-        <div style={{
-          padding: '40px',
-          textAlign: 'center',
-          color: '#666',
-          fontSize: '16px'
-        }}>
-          Loading templates...
-        </div>
-      )}
       <div className="gallery">
         {templates.map(t => (
           <div key={t.id} className={`gallery-card ${(templateId === t.id || templateName === t.name) ? 'selected' : ''}`} style={{position:'relative'}}>
