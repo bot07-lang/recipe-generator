@@ -261,7 +261,7 @@ function parseRecipeData(t: string) {
     title: title || "Untitled Recipe",
     description,
     difficulty,
-    servings: servings || "4", // Default to 4 if not provided
+    servings: servings || "", // No default - empty if not provided
     prep_time_min: prep,
     cook_time_min: cook,
     rest_time_min: rest,
@@ -927,51 +927,51 @@ Calories: 320 per serving
         setNotification({ message: 'Recipe card image generated and downloaded!', type: 'success' });
       } else {
         // Use simple div approach for templates without Google Fonts
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = filledHtml;
-        tempDiv.style.position = 'absolute';
-        tempDiv.style.left = '-9999px';
-        tempDiv.style.top = '-9999px';
-        tempDiv.style.display = 'inline-block';
-        document.body.appendChild(tempDiv);
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = filledHtml;
+      tempDiv.style.position = 'absolute';
+      tempDiv.style.left = '-9999px';
+      tempDiv.style.top = '-9999px';
+      tempDiv.style.display = 'inline-block';
+      document.body.appendChild(tempDiv);
 
-        // Wait for content to render and all images to load
+      // Wait for content to render and all images to load
         await new Promise(resolve => setTimeout(resolve, 200));
-        await new Promise(resolve => {
-          const images = Array.from(tempDiv.querySelectorAll('img')) as HTMLImageElement[];
-          if (images.length === 0) return resolve(undefined);
-          let remaining = images.length;
-          images.forEach(imgEl => {
-            if (imgEl.complete) {
-              remaining -= 1;
-              if (remaining === 0) resolve(undefined);
-            } else {
-              const done = () => { remaining -= 1; if (remaining === 0) resolve(undefined); };
-              imgEl.onload = done;
-              imgEl.onerror = done;
-            }
-          });
+      await new Promise(resolve => {
+        const images = Array.from(tempDiv.querySelectorAll('img')) as HTMLImageElement[];
+        if (images.length === 0) return resolve(undefined);
+        let remaining = images.length;
+        images.forEach(imgEl => {
+          if (imgEl.complete) {
+            remaining -= 1;
+            if (remaining === 0) resolve(undefined);
+          } else {
+            const done = () => { remaining -= 1; if (remaining === 0) resolve(undefined); };
+            imgEl.onload = done;
+            imgEl.onerror = done;
+          }
         });
-        
-        // Get the actual card element (without body padding)
-        // Many templates use `.recipe-card`; fall back to `.card` or the container
-        const cardElement = (tempDiv.querySelector('.recipe-card') || tempDiv.querySelector('.card') || tempDiv) as HTMLElement;
-        
-        // Optionally constrain export width to a Canva-like size (keeps aspect ratio)
-        const exportWidth = 1080; // change if you want 1200/1920/etc.
-        const prevWidth = (cardElement as HTMLElement).style.width;
-        if (exportWidth) {
-          (cardElement as HTMLElement).style.width = `${exportWidth}px`;
-        }
+      });
+      
+      // Get the actual card element (without body padding)
+      // Many templates use `.recipe-card`; fall back to `.card` or the container
+      const cardElement = (tempDiv.querySelector('.recipe-card') || tempDiv.querySelector('.card') || tempDiv) as HTMLElement;
+      
+      // Optionally constrain export width to a Canva-like size (keeps aspect ratio)
+      const exportWidth = 1080; // change if you want 1200/1920/etc.
+      const prevWidth = (cardElement as HTMLElement).style.width;
+      if (exportWidth) {
+        (cardElement as HTMLElement).style.width = `${exportWidth}px`;
+      }
 
         // Wait a bit more for CSS pseudo-elements to render
         await new Promise(resolve => setTimeout(resolve, 300));
 
-        // Generate PNG using html2canvas on the card element directly
-        const canvas = await html2canvas(cardElement, {
-          backgroundColor: '#ffffff',
-          scale: 2, // increase scale for sharper output at fixed width
-          useCORS: true,
+      // Generate PNG using html2canvas on the card element directly
+      const canvas = await html2canvas(cardElement, {
+        backgroundColor: '#ffffff',
+        scale: 2, // increase scale for sharper output at fixed width
+        useCORS: true,
           allowTaint: true,
           onclone: (clonedDoc, element) => {
             // Ensure all elements are visible
@@ -1016,35 +1016,35 @@ Calories: 320 per serving
               void htmlSpan.offsetHeight;
             });
           }
-        });
+      });
 
-        // Restore original width after capture
-        (cardElement as HTMLElement).style.width = prevWidth;
+      // Restore original width after capture
+      (cardElement as HTMLElement).style.width = prevWidth;
 
-        // Clean up
-        document.body.removeChild(tempDiv);
+      // Clean up
+      document.body.removeChild(tempDiv);
 
-        // Convert to JPEG blob with compression for smaller file size
-        const blob = await new Promise<Blob>((resolve, reject) => {
-          canvas.toBlob((blob) => {
-            if (blob) {
-              resolve(blob);
-            } else {
-              reject(new Error('Failed to create blob'));
-            }
-          }, 'image/jpeg', 0.85); // JPEG with 85% quality for smaller file size
-        });
-        const url = URL.createObjectURL(blob);
-        
-        setPngUrl(url);
-        
-        // Auto-download
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `recipe-card-${Date.now()}.jpg`;
-        link.click();
-        
-        setNotification({ message: 'Recipe card image generated and downloaded!', type: 'success' });
+      // Convert to JPEG blob with compression for smaller file size
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error('Failed to create blob'));
+          }
+        }, 'image/jpeg', 0.85); // JPEG with 85% quality for smaller file size
+      });
+      const url = URL.createObjectURL(blob);
+      
+      setPngUrl(url);
+      
+      // Auto-download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `recipe-card-${Date.now()}.jpg`;
+      link.click();
+      
+      setNotification({ message: 'Recipe card image generated and downloaded!', type: 'success' });
       }
     } catch (err) {
       console.error('Failed to generate image:', err);
