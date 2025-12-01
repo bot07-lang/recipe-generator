@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import html2canvas from 'html2canvas';
 import Editor from '@monaco-editor/react';
+import jsPDF from 'jspdf';
 import { supabase, Template } from '../supabase';
 import Notification from '../components/Notification';
 
@@ -378,7 +379,8 @@ Calories: 320 per serving
   const [logoImg, setLogoImg] = useState<string | null>(null);
   const [generatedHtml, setGeneratedHtml] = useState('');
   const [pngUrl, setPngUrl] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingTemplateHtml, setEditingTemplateHtml] = useState('');
@@ -751,182 +753,158 @@ Calories: 320 per serving
     }
   }
 
-  async function generatePng() {
-    if (!filledHtml) return;
-    
-    setIsGenerating(true);
-    
+  // Helper function to generate canvas from HTML
+  async function generateCanvas(): Promise<HTMLCanvasElement> {
     // Check if template uses Google Fonts (needs iframe approach)
     const usesGoogleFonts = filledHtml.includes('fonts.googleapis.com') || filledHtml.includes('fonts.gstatic.com');
     let iframe: HTMLIFrameElement | null = null;
     
-    try {
-      if (usesGoogleFonts) {
-        // Use iframe approach for templates with Google Fonts
-        iframe = document.createElement('iframe');
-        iframe.style.position = 'absolute';
-        iframe.style.left = '-9999px';
-        iframe.style.top = '0';
-        iframe.style.width = '2000px';
-        iframe.style.height = '3000px';
-        iframe.style.border = 'none';
-        iframe.style.overflow = 'visible';
-        document.body.appendChild(iframe);
+    if (usesGoogleFonts) {
+      // Use iframe approach for templates with Google Fonts
+      iframe = document.createElement('iframe');
+      iframe.style.position = 'absolute';
+      iframe.style.left = '-9999px';
+      iframe.style.top = '0';
+      iframe.style.width = '2000px';
+      iframe.style.height = '3000px';
+      iframe.style.border = 'none';
+      iframe.style.overflow = 'visible';
+      document.body.appendChild(iframe);
 
-        // Wait for iframe to be ready
-        await new Promise<void>((resolve) => {
-          if (iframe) {
-            iframe.onload = () => resolve();
-            iframe.srcdoc = filledHtml;
-          } else {
-            resolve();
-          }
-        });
+      // Wait for iframe to be ready
+      await new Promise<void>((resolve) => {
+        if (iframe) {
+          iframe.onload = () => resolve();
+          iframe.srcdoc = filledHtml;
+        } else {
+          resolve();
+        }
+      });
 
-        // Wait for initial render
-        await new Promise(resolve => setTimeout(resolve, 500));
+      // Wait for initial render
+      await new Promise(resolve => setTimeout(resolve, 500));
 
-        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-        if (!iframeDoc) {
-          throw new Error('Could not access iframe document');
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (!iframeDoc) {
+        throw new Error('Could not access iframe document');
+      }
+      
+      // Ensure iframe body/html are properly set up
+      if (iframeDoc.body) {
+        iframeDoc.body.style.margin = '0';
+        iframeDoc.body.style.padding = '0';
+        iframeDoc.body.style.overflow = 'visible';
+      }
+      if (iframeDoc.documentElement) {
+        iframeDoc.documentElement.style.overflow = 'visible';
+      }
+
+      // Wait for stylesheets (Google Fonts) to load
+      await new Promise<void>((resolve) => {
+        const stylesheets = Array.from(iframeDoc.querySelectorAll('link[rel="stylesheet"]')) as HTMLLinkElement[];
+        if (stylesheets.length === 0) {
+          setTimeout(() => resolve(), 1000);
+          return;
         }
         
-        // Ensure iframe body/html are properly set up
-        if (iframeDoc.body) {
-          iframeDoc.body.style.margin = '0';
-          iframeDoc.body.style.padding = '0';
-          iframeDoc.body.style.overflow = 'visible';
-        }
-        if (iframeDoc.documentElement) {
-          iframeDoc.documentElement.style.overflow = 'visible';
-        }
-
-        // Wait for stylesheets (Google Fonts) to load
-        await new Promise<void>((resolve) => {
-          const stylesheets = Array.from(iframeDoc.querySelectorAll('link[rel="stylesheet"]')) as HTMLLinkElement[];
-          if (stylesheets.length === 0) {
-            setTimeout(() => resolve(), 1000);
-            return;
-          }
-          
-          let stylesheetsLoaded = 0;
-          const checkComplete = async () => {
-            if (stylesheetsLoaded >= stylesheets.length) {
-              // Wait for fonts to be fully loaded using Font Loading API
-              try {
-                if (iframeDoc.fonts && iframeDoc.fonts.ready) {
-                  await iframeDoc.fonts.ready;
-                }
-              } catch (e) {
-                console.warn('Font loading API not available:', e);
+        let stylesheetsLoaded = 0;
+        const checkComplete = async () => {
+          if (stylesheetsLoaded >= stylesheets.length) {
+            // Wait for fonts to be fully loaded using Font Loading API
+            try {
+              if (iframeDoc.fonts && iframeDoc.fonts.ready) {
+                await iframeDoc.fonts.ready;
               }
-              setTimeout(() => resolve(), 1000);
+            } catch (e) {
+              console.warn('Font loading API not available:', e);
             }
-          };
+            setTimeout(() => resolve(), 1000);
+          }
+        };
 
-          stylesheets.forEach((link) => {
-            if (link.sheet) {
+        stylesheets.forEach((link) => {
+          if (link.sheet) {
+            stylesheetsLoaded++;
+            checkComplete();
+          } else {
+            link.onload = () => {
               stylesheetsLoaded++;
               checkComplete();
-            } else {
-              link.onload = () => {
-                stylesheetsLoaded++;
-                checkComplete();
-              };
-              link.onerror = () => {
-                stylesheetsLoaded++;
-                checkComplete();
-              };
-            }
-          });
-
-          // Fallback timeout
-          setTimeout(() => {
-            resolve();
-          }, 6000);
+            };
+            link.onerror = () => {
+              stylesheetsLoaded++;
+              checkComplete();
+            };
+          }
         });
 
-        // Wait for images to load
-        await new Promise<void>((resolve) => {
-          const images = Array.from(iframeDoc.querySelectorAll('img')) as HTMLImageElement[];
-          if (images.length === 0) {
-            resolve();
-            return;
-          }
-          
-          let imagesLoaded = 0;
-          images.forEach((imgEl) => {
-            if (imgEl.complete && (imgEl.naturalWidth > 0 || imgEl.src.startsWith('data:'))) {
+        // Fallback timeout
+        setTimeout(() => {
+          resolve();
+        }, 6000);
+      });
+
+      // Wait for images to load
+      await new Promise<void>((resolve) => {
+        const images = Array.from(iframeDoc.querySelectorAll('img')) as HTMLImageElement[];
+        if (images.length === 0) {
+          resolve();
+          return;
+        }
+        
+        let imagesLoaded = 0;
+        images.forEach((imgEl) => {
+          if (imgEl.complete && (imgEl.naturalWidth > 0 || imgEl.src.startsWith('data:'))) {
+            imagesLoaded++;
+            if (imagesLoaded >= images.length) resolve();
+          } else {
+            imgEl.onload = () => {
               imagesLoaded++;
               if (imagesLoaded >= images.length) resolve();
-            } else {
-              imgEl.onload = () => {
-                imagesLoaded++;
-                if (imagesLoaded >= images.length) resolve();
-              };
-              imgEl.onerror = () => {
-                imagesLoaded++;
-                if (imagesLoaded >= images.length) resolve();
-              };
-            }
-          });
-          
-          // Fallback timeout
-          setTimeout(() => resolve(), 5000);
-        });
-
-        // Find the main container element (support multiple template structures)
-        const cardElement = iframeDoc.querySelector('.page') || 
-                           iframeDoc.querySelector('.recipe-card') || 
-                           iframeDoc.querySelector('.card') || 
-                           iframeDoc.querySelector('.container') ||
-                           iframeDoc.querySelector('.recipe-grid') ||
-                           iframeDoc.body;
-
-        if (!cardElement) {
-          throw new Error('Could not find container element');
-        }
-
-        // Wait a bit more for fonts to fully render
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Generate PNG using html2canvas
-        const canvas = await html2canvas(cardElement as HTMLElement, {
-          backgroundColor: '#ffffff',
-          scale: 2,
-          useCORS: true,
-          allowTaint: true,
-          logging: false
-        });
-
-        // Clean up iframe
-        if (iframe && iframe.parentNode) {
-          document.body.removeChild(iframe);
-        }
-
-        // Convert to JPEG blob
-        const blob = await new Promise<Blob>((resolve, reject) => {
-          canvas.toBlob((blob) => {
-            if (blob) {
-              resolve(blob);
-            } else {
-              reject(new Error('Failed to create blob'));
-            }
-          }, 'image/jpeg', 0.92);
+            };
+            imgEl.onerror = () => {
+              imagesLoaded++;
+              if (imagesLoaded >= images.length) resolve();
+            };
+          }
         });
         
-        const url = URL.createObjectURL(blob);
-        setPngUrl(url);
-        
-        // Auto-download
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `recipe-card-${Date.now()}.jpg`;
-        link.click();
-        
-        setNotification({ message: 'Recipe card image generated and downloaded!', type: 'success' });
-      } else {
-        // Use simple div approach for templates without Google Fonts
+        // Fallback timeout
+        setTimeout(() => resolve(), 5000);
+      });
+
+      // Find the main container element (support multiple template structures)
+      const cardElement = iframeDoc.querySelector('.page') || 
+                         iframeDoc.querySelector('.recipe-card') || 
+                         iframeDoc.querySelector('.card') || 
+                         iframeDoc.querySelector('.container') ||
+                         iframeDoc.querySelector('.recipe-grid') ||
+                         iframeDoc.body;
+
+      if (!cardElement) {
+        throw new Error('Could not find container element');
+      }
+
+      // Wait a bit more for fonts to fully render
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Generate canvas using html2canvas
+      const canvas = await html2canvas(cardElement as HTMLElement, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        logging: false
+      });
+
+      // Clean up iframe
+      if (iframe && iframe.parentNode) {
+        document.body.removeChild(iframe);
+      }
+
+      return canvas;
+    } else {
+      // Use simple div approach for templates without Google Fonts
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = filledHtml;
       tempDiv.style.position = 'absolute';
@@ -936,7 +914,7 @@ Calories: 320 per serving
       document.body.appendChild(tempDiv);
 
       // Wait for content to render and all images to load
-        await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(resolve => setTimeout(resolve, 200));
       await new Promise(resolve => {
         const images = Array.from(tempDiv.querySelectorAll('img')) as HTMLImageElement[];
         if (images.length === 0) return resolve(undefined);
@@ -964,58 +942,58 @@ Calories: 320 per serving
         (cardElement as HTMLElement).style.width = `${exportWidth}px`;
       }
 
-        // Wait a bit more for CSS pseudo-elements to render
-        await new Promise(resolve => setTimeout(resolve, 300));
+      // Wait a bit more for CSS pseudo-elements to render
+      await new Promise(resolve => setTimeout(resolve, 300));
 
-      // Generate PNG using html2canvas on the card element directly
+      // Generate canvas using html2canvas on the card element directly
       const canvas = await html2canvas(cardElement, {
         backgroundColor: '#ffffff',
         scale: 2, // increase scale for sharper output at fixed width
         useCORS: true,
-          allowTaint: true,
-          onclone: (clonedDoc, element) => {
-            // Ensure all elements are visible
-            const allElements = clonedDoc.querySelectorAll('*');
-            allElements.forEach((el) => {
-              const htmlEl = el as HTMLElement;
-              htmlEl.style.visibility = 'visible';
-              htmlEl.style.display = '';
-              htmlEl.style.opacity = '1';
-            });
-            
-            // Force pseudo-elements to render by accessing their computed styles
-            const elementsWithPseudo = clonedDoc.querySelectorAll('.ingredients-list li, .instructions-list li, .meta span');
-            elementsWithPseudo.forEach((el) => {
-              const htmlEl = el as HTMLElement;
-              // Access computed styles to trigger pseudo-element rendering
-              const beforeStyle = clonedDoc.defaultView?.getComputedStyle(htmlEl, '::before');
-              const afterStyle = clonedDoc.defaultView?.getComputedStyle(htmlEl, '::after');
-              // Force reflow
-              void htmlEl.offsetHeight;
-            });
-            
-            // Ensure headings are visible and properly styled
-            const headings = clonedDoc.querySelectorAll('h1, h2, h3, h4, h5, h6');
-            headings.forEach((heading) => {
-              const htmlHeading = heading as HTMLElement;
-              htmlHeading.style.visibility = 'visible';
-              htmlHeading.style.display = '';
-              htmlHeading.style.opacity = '1';
-              void htmlHeading.offsetHeight;
-            });
-            
-            // Ensure emoji icons in meta spans are visible
-            const metaSpans = clonedDoc.querySelectorAll('.meta span');
-            metaSpans.forEach((span) => {
-              const htmlSpan = span as HTMLElement;
-              htmlSpan.style.visibility = 'visible';
-              htmlSpan.style.display = '';
-              htmlSpan.style.opacity = '1';
-              // Force font rendering for emojis
-              htmlSpan.style.fontFamily = 'Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"';
-              void htmlSpan.offsetHeight;
-            });
-          }
+        allowTaint: true,
+        onclone: (clonedDoc, element) => {
+          // Ensure all elements are visible
+          const allElements = clonedDoc.querySelectorAll('*');
+          allElements.forEach((el) => {
+            const htmlEl = el as HTMLElement;
+            htmlEl.style.visibility = 'visible';
+            htmlEl.style.display = '';
+            htmlEl.style.opacity = '1';
+          });
+          
+          // Force pseudo-elements to render by accessing their computed styles
+          const elementsWithPseudo = clonedDoc.querySelectorAll('.ingredients-list li, .instructions-list li, .meta span');
+          elementsWithPseudo.forEach((el) => {
+            const htmlEl = el as HTMLElement;
+            // Access computed styles to trigger pseudo-element rendering
+            const beforeStyle = clonedDoc.defaultView?.getComputedStyle(htmlEl, '::before');
+            const afterStyle = clonedDoc.defaultView?.getComputedStyle(htmlEl, '::after');
+            // Force reflow
+            void htmlEl.offsetHeight;
+          });
+          
+          // Ensure headings are visible and properly styled
+          const headings = clonedDoc.querySelectorAll('h1, h2, h3, h4, h5, h6');
+          headings.forEach((heading) => {
+            const htmlHeading = heading as HTMLElement;
+            htmlHeading.style.visibility = 'visible';
+            htmlHeading.style.display = '';
+            htmlHeading.style.opacity = '1';
+            void htmlHeading.offsetHeight;
+          });
+          
+          // Ensure emoji icons in meta spans are visible
+          const metaSpans = clonedDoc.querySelectorAll('.meta span');
+          metaSpans.forEach((span) => {
+            const htmlSpan = span as HTMLElement;
+            htmlSpan.style.visibility = 'visible';
+            htmlSpan.style.display = '';
+            htmlSpan.style.opacity = '1';
+            // Force font rendering for emojis
+            htmlSpan.style.fontFamily = 'Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"';
+            void htmlSpan.offsetHeight;
+          });
+        }
       });
 
       // Restore original width after capture
@@ -1024,7 +1002,18 @@ Calories: 320 per serving
       // Clean up
       document.body.removeChild(tempDiv);
 
-      // Convert to JPEG blob with compression for smaller file size
+      return canvas;
+    }
+  }
+
+  async function generatePng() {
+    if (!filledHtml) return;
+    
+    setIsGeneratingImage(true);
+    
+    try {
+      const canvas = await generateCanvas();
+      // Convert to JPEG blob
       const blob = await new Promise<Blob>((resolve, reject) => {
         canvas.toBlob((blob) => {
           if (blob) {
@@ -1032,10 +1021,10 @@ Calories: 320 per serving
           } else {
             reject(new Error('Failed to create blob'));
           }
-        }, 'image/jpeg', 0.85); // JPEG with 85% quality for smaller file size
+        }, 'image/jpeg', 0.85);
       });
-      const url = URL.createObjectURL(blob);
       
+      const url = URL.createObjectURL(blob);
       setPngUrl(url);
       
       // Auto-download
@@ -1045,17 +1034,51 @@ Calories: 320 per serving
       link.click();
       
       setNotification({ message: 'Recipe card image generated and downloaded!', type: 'success' });
-      }
     } catch (err) {
       console.error('Failed to generate image:', err);
       setNotification({ message: `Failed to generate image: ${err instanceof Error ? err.message : 'Unknown error'}. Please try again.`, type: 'error' });
-      
-      // Clean up iframe on error
-      if (iframe && iframe.parentNode) {
-        document.body.removeChild(iframe);
-      }
     } finally {
-      setIsGenerating(false);
+      setIsGeneratingImage(false);
+    }
+  }
+
+  async function generatePdf() {
+    if (!filledHtml) return;
+    
+    setIsGeneratingPdf(true);
+    
+    try {
+      const canvas = await generateCanvas();
+      
+      // Convert canvas to image data
+      const imgData = canvas.toDataURL('image/png', 1.0);
+      
+      // Calculate PDF dimensions (convert pixels to mm)
+      // jsPDF uses mm as units, and 1mm ≈ 3.779527559 pixels at 96 DPI
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const pdfWidth = imgWidth * 0.264583; // Convert px to mm
+      const pdfHeight = imgHeight * 0.264583;
+      
+      // Create PDF with dimensions matching the canvas
+      const pdf = new jsPDF({
+        orientation: pdfWidth > pdfHeight ? 'landscape' : 'portrait',
+        unit: 'mm',
+        format: [pdfWidth, pdfHeight]
+      });
+      
+      // Add image to PDF (fill entire page)
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      
+      // Download PDF
+      pdf.save(`recipe-card-${Date.now()}.pdf`);
+      
+      setNotification({ message: 'Recipe card PDF generated and downloaded!', type: 'success' });
+    } catch (err) {
+      console.error('Failed to generate PDF:', err);
+      setNotification({ message: `Failed to generate PDF: ${err instanceof Error ? err.message : 'Unknown error'}. Please try again.`, type: 'error' });
+    } finally {
+      setIsGeneratingPdf(false);
     }
   }
 
@@ -1189,8 +1212,11 @@ Calories: 320 per serving
         {generatedHtml && (
           <div className="result-bar">
             <button className="btn" onClick={copyHtml}>Copy HTML</button>
-            <button className="btn btn-secondary" onClick={generatePng} disabled={isGenerating}>
-              {isGenerating ? 'Generating...' : 'Download Image'}
+            <button className="btn btn-secondary" onClick={generatePng} disabled={isGeneratingImage || isGeneratingPdf}>
+              {isGeneratingImage ? 'Generating...' : 'Download Image'}
+            </button>
+            <button className="btn btn-secondary" onClick={generatePdf} disabled={isGeneratingImage || isGeneratingPdf}>
+              {isGeneratingPdf ? 'Generating...' : 'Download PDF'}
             </button>
           </div>
         )}
