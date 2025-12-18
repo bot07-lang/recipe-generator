@@ -179,23 +179,11 @@ function cleanIngredients(text = ""): string[] {
   // Remove "Ingredients:" label if present
   t = t.replace(/^Ingredients\s*:\s*/gim, "").trim();
   
-  // Split by lines first to handle | separators properly
+  // Split by lines - each line is one ingredient (don't split by commas)
+  // This preserves ingredients like "5 ripe bananas, mashed" as a single ingredient
   const lines = t.split('\n').map(line => line.trim()).filter(Boolean);
   
-  const parts: string[] = [];
-  for (const line of lines) {
-    // Handle | separator: "2 cloves garlic | minced" -> keep as "2 cloves garlic | minced" or split
-    // For now, keep the full line including | separator
-    if (line.includes('|')) {
-      parts.push(line);
-    } else {
-      // Split by comma if no | separator
-      const commaParts = line.split(',').map(s => s.trim()).filter(Boolean);
-      parts.push(...commaParts);
-    }
-  }
-
-  return parts.filter(Boolean);
+  return lines;
 }
 
 function cleanDirections(text = ""): string[] {
