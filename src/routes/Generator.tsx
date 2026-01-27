@@ -377,9 +377,6 @@ Calories: 320 per serving
   const [editingPreviewImageFile, setEditingPreviewImageFile] = useState<File | null>(null);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [showConfirmSave, setShowConfirmSave] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deletingTemplate, setDeletingTemplate] = useState<Template | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   // Input normalization: accept with or without ### section headers
   const selected = useMemo(() => {
@@ -432,44 +429,6 @@ Calories: 320 per serving
     return null;
   }
 
-  async function onDeleteTemplate() {
-    if (!deletingTemplate) return;
-    setIsDeleting(true);
-    try {
-      // Delete DB row
-      const { error } = await supabase
-        .from('templates')
-        .delete()
-        .eq('id', deletingTemplate.id);
-      if (error) throw error;
-
-      // Attempt to delete preview image if it's in our Supabase storage
-      const storageRef = extractSupabaseStoragePath(deletingTemplate.preview_image_url);
-      if (storageRef) {
-        const { error: removeError } = await supabase.storage
-          .from(storageRef.bucket)
-          .remove([storageRef.path]);
-        if (removeError) {
-          console.warn('Preview image remove failed:', removeError, storageRef);
-        }
-      }
-
-      // Update local state
-      setTemplates(prev => prev.filter(t => t.id !== deletingTemplate.id));
-      if (templateId === deletingTemplate.id || templateName === deletingTemplate.name) {
-        setTemplateId(null);
-        setTemplateName('');
-      }
-      setShowDeleteModal(false);
-      setDeletingTemplate(null);
-      setNotification({ message: 'Template deleted', type: 'success' });
-    } catch (err) {
-      console.error('Delete failed:', err);
-      setNotification({ message: 'Failed to delete template. Try again.', type: 'error' });
-    } finally {
-      setIsDeleting(false);
-    }
-  }
 
   useEffect(() => {
     loadTemplates();
@@ -1095,34 +1054,6 @@ Calories: 320 per serving
               <img src={getPreviewUrl(t)} alt={t.name} />
               <div className="gallery-name">{t.name}</div>
             </button>
-            {/* Delete icon - floating half outside top-right */}
-            <button
-              title="Delete template"
-              onClick={(e)=>{
-                e.preventDefault();
-                e.stopPropagation();
-                setDeletingTemplate(t);
-                setShowDeleteModal(true);
-              }}
-              style={{
-                position:'absolute', top:8, right:8, width:34, height:34,
-                borderRadius:'50%', background:'#ffffff', border:'1px solid #e8e8e8',
-                display:'flex', alignItems:'center', justifyContent:'center',
-                boxShadow:'0 4px 10px rgba(0,0,0,0.10)', cursor:'pointer',
-                zIndex:2,
-                transition:'all .15s ease'
-              }}
-              onMouseOver={(e)=>{(e.currentTarget as HTMLButtonElement).style.background='#fff2f3'; (e.currentTarget as HTMLButtonElement).style.borderColor='#ffcdd2'; (e.currentTarget as HTMLButtonElement).style.transform='scale(1.06)';}}
-              onMouseOut={(e)=>{(e.currentTarget as HTMLButtonElement).style.background='#ffffff'; (e.currentTarget as HTMLButtonElement).style.borderColor='#e8e8e8'; (e.currentTarget as HTMLButtonElement).style.transform='scale(1)';}}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b00020" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="3 6 5 6 21 6"/>
-                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                <path d="M10 11v6"/>
-                <path d="M14 11v6"/>
-                <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
-              </svg>
-            </button>
           </div>
         ))}
       </div>
@@ -1579,42 +1510,6 @@ Calories: 320 per serving
             <div style={{display:'flex', justifyContent:'flex-end', gap:10, padding:'14px 20px', borderTop:'1px solid #eee'}}>
               <button className="btn btn-secondary" onClick={()=>setShowConfirmSave(false)} disabled={isSavingTemplate}>Cancel</button>
               <button className="btn" onClick={async ()=>{ setShowConfirmSave(false); await saveTemplate(); }} disabled={isSavingTemplate}>{isSavingTemplate ? 'Saving...' : 'Confirm & Save'}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Template Confirmation */}
-      {showDeleteModal && deletingTemplate && (
-        <div style={{
-          position:'fixed', top:0, left:0, right:0, bottom:0,
-          background:'rgba(0,0,0,0.6)', display:'flex', justifyContent:'center', alignItems:'center',
-          zIndex:2500, padding:'20px', backdropFilter:'blur(4px)'
-        }} onClick={()=>!isDeleting && setShowDeleteModal(false)}>
-          <div style={{
-            background:'#fff', borderRadius:12, width:'520px', maxWidth:'95vw',
-            boxShadow:'0 16px 48px rgba(0,0,0,.25)', overflow:'hidden', position:'relative'
-          }} onClick={(e)=>e.stopPropagation()}>
-            <div style={{padding:'18px 20px', borderBottom:'1px solid #eee', fontWeight:700}}>Delete Template</div>
-            <button 
-              onClick={()=>setShowDeleteModal(false)}
-              aria-label="Close"
-              style={{
-                position:'absolute', top:10, right:10, width:36, height:36,
-                border:'none', background:'#fff', borderRadius:'50%', cursor:'pointer',
-                boxShadow:'0 2px 8px rgba(0,0,0,0.08)'
-              }}
-              onMouseOver={(e)=>{e.currentTarget.style.background='#f3f3f3'}}
-              onMouseOut={(e)=>{e.currentTarget.style.background='#fff'}}
-            >
-              ×
-            </button>
-            <div style={{padding:'18px 20px', color:'#333'}}>
-              Are you sure you want to delete "{deletingTemplate.name}"? This action cannot be undone.
-            </div>
-            <div style={{display:'flex', justifyContent:'flex-end', gap:10, padding:'14px 20px', borderTop:'1px solid #eee'}}>
-              <button className="btn btn-secondary" onClick={()=>setShowDeleteModal(false)} disabled={isDeleting}>Cancel</button>
-              <button className="btn btn-warn" onClick={onDeleteTemplate} disabled={isDeleting}>{isDeleting ? 'Deleting…' : 'Delete'}</button>
             </div>
           </div>
         </div>
