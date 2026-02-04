@@ -33,6 +33,34 @@ const DEFAULT_TEMPLATES: Template[] = [
     last_generated_html: null,
     last_generated_at: null
   },
+  {
+    id: 2,
+    name: 'Nutritional Infographic Card',
+    html: `<!DOCTYPE html><html><head><style>
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Playfair+Display:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; padding: 40px 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    .nutrition-card { background: white; width: 1200px; max-width: 100%; padding: 70px 90px; position: relative; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 60px; }
+    .card-title { font-family: 'Cormorant Garamond', 'Playfair Display', serif; font-size: 78px; font-weight: 700; color: #1a1a1a; letter-spacing: -0.5px; line-height: 1; font-style: normal; flex: 1; }
+    .serving-size { font-family: 'Inter', sans-serif; font-size: 16px; color: #666; font-weight: 400; text-transform: lowercase; margin-left: 40px; padding-top: 8px; white-space: nowrap; }
+    .card-content { display: flex; align-items: flex-start; margin-bottom: 50px; position: relative; }
+    .image-section { flex: 0 0 500px; position: relative; padding-right: 60px; }
+    .nutrition-image { width: 100%; height: 500px; object-fit: cover; border-radius: 12px; }
+    .divider { position: absolute; left: 500px; top: 0; bottom: 0; width: 1px; background: #e0e0e0; }
+    .facts-section { flex: 1; display: flex; flex-direction: column; gap: 45px; padding-left: 60px; padding-top: 10px; }
+    .fact-item { display: flex; flex-direction: column; gap: 10px; }
+    .fact-value { font-family: 'Inter', sans-serif; font-size: 68px; font-weight: 700; color: #1a1a1a; line-height: 1; letter-spacing: -3px; }
+    .fact-description { font-family: 'Inter', sans-serif; font-size: 15px; color: #666; line-height: 1.5; font-weight: 400; }
+    .card-statement { text-align: center; font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 700; color: #1a1a1a; text-transform: uppercase; letter-spacing: 1.2px; margin-top: 50px; padding-top: 40px; border-top: 1px solid #e0e0e0; line-height: 1.4; }
+    </style></head><body><div class="nutrition-card"><div class="card-header"><h1 class="card-title">{{TITLE}}</h1><div class="serving-size">{{SERVING_SIZE}}</div></div><div class="card-content"><div class="image-section"><img src="{{IMAGE}}" class="nutrition-image" alt="{{TITLE}}" /></div><div class="divider"></div><div class="facts-section"><div class="fact-item"><div class="fact-value">{{NUTRITION_PROTEIN_VALUE}}</div><div class="fact-description">{{NUTRITION_PROTEIN_DESC}}</div></div><div class="fact-item"><div class="fact-value">{{NUTRITION_FAT_VALUE}}</div><div class="fact-description">{{NUTRITION_FAT_DESC}}</div></div><div class="fact-item"><div class="fact-value">{{NUTRITION_CHOLESTEROL_VALUE}}</div><div class="fact-description">{{NUTRITION_CHOLESTEROL_DESC}}</div></div><div class="fact-item"><div class="fact-value">{{NUTRITION_CARBS_VALUE}}</div><div class="fact-description">{{NUTRITION_CARBS_DESC}}</div></div></div></div><div class="card-statement">{{NUTRITION_STATEMENT}}</div></div></body></html>`,
+    preview_image_url: null,
+    created_by: 'system',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    last_generated_html: null,
+    last_generated_at: null
+  },
 ];
 
 function getFieldBlock(text: string, label: string): string {
@@ -104,9 +132,25 @@ function getFieldBlock(text: string, label: string): string {
     return "";
   }
   
+  // For Serving Size, handle specially
+  if (label.includes('Serving Size')) {
+    const lookaheadPattern = '(Recipe |Serving\\s+Size|Nutrition\\s+Statement|Difficulty|No\\.|Preparation\\s+Time|Cooking|Rest|Total|Cooking Temp|Calories|Best Season|Website|###|$)';
+    const re = new RegExp(`Serving\\s*Size\\s*:\\s*([\\s\\S]*?)(?=\\n${lookaheadPattern})`, "i");
+    const m = text.match(re);
+    return m ? m[1].trim() : "";
+  }
+  
+  // For Nutrition Statement, handle specially
+  if (label.includes('Nutrition Statement')) {
+    const lookaheadPattern = '(Recipe |Serving\\s+Size|Nutrition\\s+Statement|Difficulty|No\\.|Preparation\\s+Time|Cooking|Rest|Total|Cooking Temp|Calories|Best Season|Website|###|$)';
+    const re = new RegExp(`Nutrition\\s*Statement\\s*:\\s*([\\s\\S]*?)(?=\\n${lookaheadPattern})`, "i");
+    const m = text.match(re);
+    return m ? m[1].trim() : "";
+  }
+  
   // For No. of Servings, try "No. of Servings", "Servings", and "Serving" (singular)
   if (label.includes('No\\. of Servings') || label.includes('Servings') || label.includes('Serving')) {
-    const lookaheadPattern = '(Recipe |Difficulty|No\\.|Preparation\\s+Time|Cooking|Rest|Total|Cooking Temp|Calories|Best Season|Website|###|$)';
+    const lookaheadPattern = '(Recipe |Serving\\s+Size|Nutrition\\s+Statement|Difficulty|No\\.|Preparation\\s+Time|Cooking|Rest|Total|Cooking Temp|Calories|Best Season|Website|###|$)';
     const patterns = [
       `No\\.\\s*of\\s*Servings?\\s*:\\s*([\\s\\S]*?)(?=\\n${lookaheadPattern})`,
       `Servings\\s*:\\s*([\\s\\S]*?)(?=\\n${lookaheadPattern})`,
@@ -123,7 +167,7 @@ function getFieldBlock(text: string, label: string): string {
   // For other fields, escape special regex chars in label
   const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   // Updated lookahead to match complete field names, not partial matches
-  const lookaheadPattern = '(Recipe |Difficulty|No\\.|Preparation\\s+Time|Cooking|Rest|Total|Cooking Temp|Calories|Best Season|Website|###|$)';
+  const lookaheadPattern = '(Recipe |Serving\\s+Size|Nutrition\\s+Statement|Difficulty|No\\.|Preparation\\s+Time|Cooking|Rest|Total|Cooking Temp|Calories|Best Season|Website|###|$)';
   const re = new RegExp(`${escapedLabel}:\\s*([\\s\\S]*?)(?=\\n${lookaheadPattern})`, "i");
   const m = text.match(re);
   return m ? m[1].trim() : "";
@@ -216,6 +260,43 @@ function stripLabel(text = "", labelRegex: RegExp): string {
   return text.replace(labelRegex, "").trim();
 }
 
+// Parse nutrition section into structured key-value pairs
+// Format: "Protein: 94-96% Protein rich intake Calories"
+// Returns: { Protein: { value: "94-96%", description: "Protein rich intake Calories" }, ... }
+function parseNutritionFacts(nutritionText: string): Record<string, { value: string; description: string }> {
+  const facts: Record<string, { value: string; description: string }> = {};
+  if (!nutritionText) return facts;
+  
+  // Split by lines and parse each line
+  const lines = nutritionText.split('\n').map(line => line.trim()).filter(Boolean);
+  
+  for (const line of lines) {
+    // Match pattern: "Key: value description" or "Key: value"
+    // Examples: "Protein: 94-96% Protein rich intake Calories"
+    //           "Fat: 4-6% of Fat calories"
+    //           "Cholesterol: 15%"
+    const match = line.match(/^([^:]+):\s*(.+)$/);
+    if (match) {
+      const key = match[1].trim();
+      const rest = match[2].trim();
+      
+      // Try to extract value (usually starts with number/percentage)
+      // Value could be: "94-96%", "4-6%", "15%", "0%", etc.
+      const valueMatch = rest.match(/^([\d\-%\.\s]+)/);
+      if (valueMatch) {
+        const value = valueMatch[1].trim();
+        const description = rest.substring(valueMatch[0].length).trim();
+        facts[key] = { value, description };
+      } else {
+        // If no clear value pattern, use entire rest as value
+        facts[key] = { value: rest, description: '' };
+      }
+    }
+  }
+  
+  return facts;
+}
+
 function parseRecipeData(t: string) {
   if (typeof t !== "string" || !t.trim()) return {};
 
@@ -231,6 +312,8 @@ function parseRecipeData(t: string) {
   let calories      = getFieldBlock(t, "Calories");
   const season      = getFieldBlock(t, "Best Season");
   const website     = getFieldBlock(t, "Website");
+  const servingSize  = getFieldBlock(t, "Serving Size");
+  const nutritionStatement = getFieldBlock(t, "Nutrition Statement");
 
   calories = calories.replace(/\bper\s*serving\b/i, "").trim();
 
@@ -245,6 +328,9 @@ function parseRecipeData(t: string) {
   const instructions = cleanDirections(instructionsRaw);
   const equipment = stripLabel(equipmentRaw, /^Equipment\s*:\s*/i);
   const nutrition = stripLabel(nutritionRaw, /^Nutrition(?:\s*Facts)?\s*:\s*/i);
+  
+  // Parse nutrition into structured facts
+  const nutritionFacts = parseNutritionFacts(nutrition);
 
   return {
     title: title || "Untitled Recipe",
@@ -259,16 +345,27 @@ function parseRecipeData(t: string) {
     calories,
     season,
     website,
+    serving_size: servingSize,
+    nutrition_statement: nutritionStatement,
     ingredients, // Array of clean ingredients
     instructions, // Array of clean instructions
     equipment,
-    nutrition
+    nutrition,
+    nutrition_facts: nutritionFacts // Structured nutrition data
   };
 }
 
 const ingredientsHtml = (arr?: string[]) => arr?.length ? `<ul class="ingredients-list">${arr.map(i => `<li>${i}</li>`).join('')}</ul>` : '';
 const instructionsHtml = (arr?: string[]) => arr?.length ? `<ul class="instructions-list">${arr.map(i => `<li>${i}</li>`).join('')}</ul>` : '';
 const itemsOnlyHtml = (arr?: string[]) => arr?.length ? arr.map(i => `<li>${i}</li>`).join('') : '';
+
+// Helper to get nutrition fact value/description
+function getNutritionFact(data: Record<string, any>, key: string, type: 'value' | 'description' = 'value'): string {
+  if (!data.nutrition_facts || typeof data.nutrition_facts !== 'object') return '';
+  const fact = data.nutrition_facts[key];
+  if (!fact) return '';
+  return type === 'value' ? fact.value : fact.description;
+}
 
 // Replace any placeholders found in the html with data keys (case-insensitive)
 function fillPlaceholders(templateHtml: string, data: Record<string, any>, imageSrc: string | null, logoSrc?: string | null): string {
@@ -298,6 +395,9 @@ function fillPlaceholders(templateHtml: string, data: Record<string, any>, image
     CALORIES: data.calories || '',
     RATING: data.rating || '5', // Default rating
     WEBSITE: data.website || '',
+    SERVING_SIZE: data.serving_size || '',
+    NUTRITION_STATEMENT: data.nutrition_statement || '',
+    STATEMENT: data.nutrition_statement || '', // Alternative key
     // If developer provided UL/OL around the placeholder, output only <li> items
     // Otherwise, output our full list markup with default classes
     INGREDIENTS: ingredientsInsideList ? itemsOnlyHtml(data.ingredients) : ingredientsHtml(data.ingredients),
@@ -307,7 +407,22 @@ function fillPlaceholders(templateHtml: string, data: Record<string, any>, image
     IMAGE_URL: imageSrc || '',
     LOGO: logoSrc || '',
     LOGO_URL: logoSrc || '',
-    NOTES: data.notes || data.description || ''
+    NOTES: data.notes || data.description || '',
+    // Nutrition facts - common keys
+    NUTRITION_PROTEIN_VALUE: getNutritionFact(data, 'Protein', 'value'),
+    NUTRITION_PROTEIN_DESC: getNutritionFact(data, 'Protein', 'description'),
+    NUTRITION_FAT_VALUE: getNutritionFact(data, 'Fat', 'value'),
+    NUTRITION_FAT_DESC: getNutritionFact(data, 'Fat', 'description'),
+    NUTRITION_CHOLESTEROL_VALUE: getNutritionFact(data, 'Cholesterol', 'value'),
+    NUTRITION_CHOLESTEROL_DESC: getNutritionFact(data, 'Cholesterol', 'description'),
+    NUTRITION_CARBS_VALUE: getNutritionFact(data, 'Carbs', 'value'),
+    NUTRITION_CARBS_DESC: getNutritionFact(data, 'Carbs', 'description'),
+    NUTRITION_CARBOHYDRATES_VALUE: getNutritionFact(data, 'Carbohydrates', 'value'),
+    NUTRITION_CARBOHYDRATES_DESC: getNutritionFact(data, 'Carbohydrates', 'description'),
+    NUTRITION_FIBER_VALUE: getNutritionFact(data, 'Fiber', 'value'),
+    NUTRITION_FIBER_DESC: getNutritionFact(data, 'Fiber', 'description'),
+    NUTRITION_SODIUM_VALUE: getNutritionFact(data, 'Sodium', 'value'),
+    NUTRITION_SODIUM_DESC: getNutritionFact(data, 'Sodium', 'description')
   };
   
   // Replace {{KEY}} placeholders
@@ -332,6 +447,13 @@ function fillPlaceholders(templateHtml: string, data: Record<string, any>, image
   html = html.replace(/\[\s*STEP\s+(\d+)\s*\]/gi, (_m, num) => {
     const index = parseInt(num) - 1;
     return data.instructions && data.instructions[index] ? data.instructions[index] : '';
+  });
+  
+  // Handle nutrition fact placeholders with dynamic keys
+  // Format: {{NUTRITION_[KEY]_VALUE}} or {{NUTRITION_[KEY]_DESC}}
+  html = html.replace(/\{\{\s*NUTRITION_([A-Z_]+)_(VALUE|DESC)\s*\}\}/gi, (_m, keyRaw, type) => {
+    const key = keyRaw.replace(/_/g, ' ');
+    return getNutritionFact(data, key, type.toLowerCase() as 'value' | 'description');
   });
   
   // Note: intentionally NOT replacing standalone ALL-CAPS words without delimiters
@@ -823,6 +945,7 @@ Calories: 320 per serving
       // Find the main container element (support multiple template structures)
       const cardElement = iframeDoc.querySelector('.page') || 
                          iframeDoc.querySelector('.recipe-card') || 
+                         iframeDoc.querySelector('.nutrition-card') ||
                          iframeDoc.querySelector('.card') || 
                          iframeDoc.querySelector('.container') ||
                          iframeDoc.querySelector('.recipe-grid') ||
@@ -880,7 +1003,7 @@ Calories: 320 per serving
       
       // Get the actual card element (without body padding)
       // Many templates use `.recipe-card`; fall back to `.card` or the container
-      const cardElement = (tempDiv.querySelector('.recipe-card') || tempDiv.querySelector('.card') || tempDiv) as HTMLElement;
+      const cardElement = (tempDiv.querySelector('.recipe-card') || tempDiv.querySelector('.nutrition-card') || tempDiv.querySelector('.card') || tempDiv) as HTMLElement;
       
       // Optionally constrain export width to a Canva-like size (keeps aspect ratio)
       const exportWidth = 1080; // change if you want 1200/1920/etc.
