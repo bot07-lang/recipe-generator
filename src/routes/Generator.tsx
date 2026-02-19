@@ -262,6 +262,7 @@ function stripLabel(text = "", labelRegex: RegExp): string {
 
 // Parse nutrition section into structured key-value pairs
 // Format: "Protein: 94-96% Protein rich intake Calories"
+// Format: "Protein: ~18-20g (about 80% of total calories come from protein). Cod is a lean protein source."
 // Returns: { Protein: { value: "94-96%", description: "Protein rich intake Calories" }, ... }
 function parseNutritionFacts(nutritionText: string): Record<string, { value: string; description: string }> {
   const facts: Record<string, { value: string; description: string }> = {};
@@ -274,22 +275,40 @@ function parseNutritionFacts(nutritionText: string): Record<string, { value: str
     // Match pattern: "Key: value description" or "Key: value"
     // Examples: "Protein: 94-96% Protein rich intake Calories"
     //           "Fat: 4-6% of Fat calories"
+    //           "Protein: ~18-20g (about 80% of total calories come from protein). Cod is a lean protein source."
     //           "Cholesterol: 15%"
     const match = line.match(/^([^:]+):\s*(.+)$/);
     if (match) {
       const key = match[1].trim();
       const rest = match[2].trim();
       
-      // Try to extract value (usually starts with number/percentage)
-      // Value could be: "94-96%", "4-6%", "15%", "0%", etc.
-      const valueMatch = rest.match(/^([\d\-%\.\s]+)/);
+      // Try to extract value - flexible pattern that handles:
+      // - Tildes: ~
+      // - Numbers and ranges: 18-20, 0.7, 94-96
+      // - Units: g, mg, %, etc.
+      // Examples: "~18-20g (description)", "~0.7g description", "94-96% description", "15%", "0%"
+      // Match: optional ~, then numbers/dots/dashes, then optional unit (g, mg, %), stop at space
+      const valueMatch = rest.match(/^(~?[\d\-\.]+(?:[\-][\d\-\.]+)?[%a-zA-Z]*?)\s/);
       if (valueMatch) {
         const value = valueMatch[1].trim();
+        // Get everything after the value and space as description
         const description = rest.substring(valueMatch[0].length).trim();
         facts[key] = { value, description };
       } else {
-        // If no clear value pattern, use entire rest as value
-        facts[key] = { value: rest, description: '' };
+        // No space after value - check if it ends with % or unit, or is just a number
+        // If it looks like just a value (ends with % or unit, or is all numbers), use it as value
+        if (rest.match(/^~?[\d\-\.]+[%a-zA-Z]*$/)) {
+          facts[key] = { value: rest, description: '' };
+        } else {
+          // Try to split at first space or parenthesis
+          const splitMatch = rest.match(/^(~?[\d\-\.]+(?:[\-][\d\-\.]+)?[%a-zA-Z]*?)([\(\)].*|$)/);
+          if (splitMatch && splitMatch[1]) {
+            facts[key] = { value: splitMatch[1].trim(), description: (splitMatch[2] || '').trim() };
+          } else {
+            // Use entire rest as value if we can't parse it
+            facts[key] = { value: rest, description: '' };
+          }
+        }
       }
     }
   }
@@ -359,10 +378,24 @@ const ingredientsHtml = (arr?: string[]) => arr?.length ? `<ul class="ingredient
 const instructionsHtml = (arr?: string[]) => arr?.length ? `<ul class="instructions-list">${arr.map(i => `<li>${i}</li>`).join('')}</ul>` : '';
 const itemsOnlyHtml = (arr?: string[]) => arr?.length ? arr.map(i => `<li>${i}</li>`).join('') : '';
 
-// Helper to get nutrition fact value/description
+// Helper to get nutrition fact value/description (case-insensitive key matching)
 function getNutritionFact(data: Record<string, any>, key: string, type: 'value' | 'description' = 'value'): string {
   if (!data.nutrition_facts || typeof data.nutrition_facts !== 'object') return '';
-  const fact = data.nutrition_facts[key];
+  
+  // Try exact match first
+  let fact = data.nutrition_facts[key];
+  
+  // If no exact match, try case-insensitive search
+  if (!fact) {
+    const lowerKey = key.toLowerCase();
+    for (const [factKey, factValue] of Object.entries(data.nutrition_facts)) {
+      if (factKey.toLowerCase() === lowerKey) {
+        fact = factValue;
+        break;
+      }
+    }
+  }
+  
   if (!fact) return '';
   return type === 'value' ? fact.value : fact.description;
 }
@@ -467,7 +500,7 @@ export default function Generator() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [templateId, setTemplateId] = useState<number | null>(null);
   const [templateName, setTemplateName] = useState('');
-  const [raw, setRaw] = useState(`Recipe Title: Delicious Banana Cake
+  const recipeCardSample = `Recipe Title: Delicious Banana Cake
 Recipe Description: A moist and flavorful banana cake that's perfect for any occasion.
 Difficulty Level: Easy
 No. of Servings: 8-10
@@ -484,7 +517,19 @@ Calories: 320 per serving
 ### Instructions
 1. Preheat oven to 350°F (175°C). Grease a 9x13 inch baking pan.
 2. Mix wet ingredients and sugars.
-3. Combine with dry ingredients and bake 40-45 minutes.`);
+3. Combine with dry ingredients and bake 40-45 minutes.`;
+
+  const nutritionCardSample = `Recipe Title: TUNA STEAK
+Serving Size: per 100 grams
+Nutrition Statement: TUNA IS NATURALLY CARB-FREE AND HAS A 0% GLYCEMIC INDEX.
+
+### Nutrition
+Protein: 94-96% Protein rich intake Calories
+Fat: 4-6% of Fat calories
+Cholesterol: 15%
+Carbs: 0% A fresh tuna steak is a protein powerhouse that contains 0% carbohydrates`;
+
+  const [raw, setRaw] = useState(recipeCardSample);
   const [img, setImg] = useState<string | null>(null);
   const [logoImg, setLogoImg] = useState<string | null>(null);
   const [generatedHtml, setGeneratedHtml] = useState('');
@@ -572,6 +617,29 @@ Calories: 320 per serving
     };
   }, []);
 
+  // Update sample content when template changes
+  useEffect(() => {
+    if (!selected) return;
+    
+    // Check if it's a nutritional card template
+    const isNutritionCard = selected.name.toLowerCase().includes('nutrition') || 
+                           selected.name.toLowerCase().includes('nutritional') ||
+                           selected.id === 2; // Default nutritional card template ID
+    
+    // Only update if content matches the other template's sample (user hasn't customized it)
+    // This prevents overwriting user's custom content
+    const currentIsRecipeSample = raw === recipeCardSample;
+    const currentIsNutritionSample = raw === nutritionCardSample;
+    const isEmpty = raw.trim() === '';
+    
+    if (isNutritionCard && (currentIsRecipeSample || isEmpty)) {
+      setRaw(nutritionCardSample);
+    } else if (!isNutritionCard && (currentIsNutritionSample || isEmpty)) {
+      setRaw(recipeCardSample);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.id, selected?.name, templateName, templateId]);
+
   async function loadTemplates() {
     try {
       const { data, error } = await supabase
@@ -650,6 +718,16 @@ Calories: 320 per serving
   // Validate placeholders present in the selected template
   const missingPlaceholders = useMemo(() => {
     if (!selected) return [] as string[];
+    
+    // Skip validation for nutritional card templates
+    const isNutritionCard = selected.name.toLowerCase().includes('nutrition') || 
+                           selected.name.toLowerCase().includes('nutritional') ||
+                           selected.id === 2; // Default nutritional card template ID
+    
+    if (isNutritionCard) {
+      return [] as string[]; // Don't show missing placeholder warnings for nutritional cards
+    }
+    
     const required = ['TITLE', 'DESCRIPTION', 'INGREDIENTS', 'INSTRUCTIONS'];
     const misses: string[] = [];
     for (const key of required) {
