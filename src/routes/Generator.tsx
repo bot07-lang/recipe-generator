@@ -87,6 +87,13 @@ function getFieldBlock(text: string, label: string): string {
     const m = text.match(re);
     return m ? m[1].trim() : "";
   }
+
+  // For Cooking Time, handle specially (same pattern as Preparation Time)
+  if (label.includes('Cooking Time')) {
+    const re = new RegExp(`Cooking\\s*Time\\s*(?:\\(Minutes\\))?\\s*:\\s*([^\\n]+)`, "i");
+    const m = text.match(re);
+    return m ? m[1].trim() : "";
+  }
   
   // For Recipe Title, try both "Recipe Title" and "Title"
   if (label.includes('Recipe Title')) {
